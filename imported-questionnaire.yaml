@@ -1,0 +1,59 @@
+id: imported-questionnaire
+title: Imported Questionnaire
+version: '1.0'
+pages:
+- id: General
+  title: General
+  description: ''
+  questions:
+  - type: text
+    prompt: What is your full name?
+    title: ''
+    description: ''
+    help: ''
+    required: true
+    default: ''
+    allow_freetext: false
+    answer: null
+    review_status: pending
+    reviewer_comment: ''
+    multiline: false
+    id: Q1
+  - type: dropdown
+    prompt: Select your country
+    title: ''
+    description: ''
+    help: ''
+    required: true
+    default: ''
+    allow_freetext: true
+    answer: null
+    review_status: pending
+    reviewer_comment: ''
+    multiline: false
+    options:
+    - value: 'no'
+      label: Norway
+    - value: se
+      label: Sweden
+    - value: other
+      label: Other
+      isOther: true
+    id: Q2
+- id: Details
+  title: Details
+  description: ''
+  questions:
+  - type: text
+    prompt: Additional notes
+    title: ''
+    description: ''
+    help: Optional freeform context
+    required: false
+    default: ''
+    allow_freetext: false
+    answer: null
+    review_status: pending
+    reviewer_comment: ''
+    multiline: false
+    id: Q3

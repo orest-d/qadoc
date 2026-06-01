@@ -1,0 +1,7 @@
+questionnaire:
+  id: question-only-import
+  title: Question Column Import
+  version: "1.0"
+
+columns:
+  prompt: question

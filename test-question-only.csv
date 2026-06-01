@@ -1,0 +1,4 @@
+question,category,owner,notes,priority
+What is your department?,HR,Alice,internal note,high
+Who is your manager?,Org,Bob,ignore this,medium
+Do you need equipment?,IT,Charlie,extra context,low

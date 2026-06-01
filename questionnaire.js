@@ -17,6 +17,15 @@
   }
 
   function ensureQuestionDefaults(question) {
+    if (!Object.prototype.hasOwnProperty.call(question, "prompt")) {
+      question.prompt = "";
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "help")) {
+      question.help = "";
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "description")) {
+      question.description = "";
+    }
     if (!Object.prototype.hasOwnProperty.call(question, "default")) {
       question.default = question.type === "checkbox" ? false : "";
     }
@@ -150,19 +159,39 @@
     if (!spec || typeof spec !== "object") {
       throw new Error("Questionnaire spec must be an object.");
     }
+    if (!Object.prototype.hasOwnProperty.call(spec, "id")) {
+      spec.id = "";
+    }
+    if (!Object.prototype.hasOwnProperty.call(spec, "title")) {
+      spec.title = "";
+    }
+    if (!Object.prototype.hasOwnProperty.call(spec, "version")) {
+      spec.version = "";
+    }
     if (!Array.isArray(spec.pages)) {
       throw new Error("Questionnaire spec must contain a pages array.");
     }
     var seenIds = {};
+    var generatedQuestionCounter = 0;
     for (var i = 0; i < spec.pages.length; i += 1) {
       var page = spec.pages[i];
+      if (!Object.prototype.hasOwnProperty.call(page, "id")) {
+        page.id = "page-" + (i + 1);
+      }
+      if (!Object.prototype.hasOwnProperty.call(page, "title")) {
+        page.title = "";
+      }
+      if (!Object.prototype.hasOwnProperty.call(page, "description")) {
+        page.description = "";
+      }
       if (!Array.isArray(page.questions)) {
         page.questions = [];
       }
       for (var j = 0; j < page.questions.length; j += 1) {
         var question = page.questions[j];
         if (!question.id) {
-          throw new Error("Each question must have an id.");
+          generatedQuestionCounter += 1;
+          question.id = "Q" + generatedQuestionCounter;
         }
         if (seenIds[question.id]) {
           throw new Error("Duplicate question id: " + question.id);
@@ -269,7 +298,20 @@
       return;
     }
     question[field] = value;
-    this.render();
+  };
+
+  QuestionnaireApp.prototype.handleLiveTextInput = function (questionId, payload) {
+    var question = this.questionsById[questionId];
+    if (!question) {
+      return;
+    }
+    if (payload.kind === "freetext") {
+      setQuestionAnswer(question, getQuestionBaseValue(question), payload.value);
+    } else if (payload.kind === "reviewer_comment") {
+      question.reviewer_comment = payload.value;
+    } else {
+      question.answer = payload.value;
+    }
   };
 
   QuestionnaireApp.prototype.nextPage = function () {
@@ -329,8 +371,8 @@
     if (question.type === "checkbox") {
       var checked = value === true ? " checked" : "";
       answerMarkup += '<label class="q-choice"><input type="checkbox" data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + checked + answerDisabled + '> <span>' + escapeHtml(question.prompt) + "</span></label>";
-      if (question.allow_freetext) {
-        answerMarkup += '<label class="q-subfield"><span>Explanation</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (value === true ? " disabled" : answerDisabled) + "></label>";
+      if (question.allow_freetext && value !== true) {
+        answerMarkup += '<label class="q-subfield"><span>Explanation</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
       }
     } else if (question.type === "radio") {
       answerMarkup += '<fieldset class="q-fieldset"><legend class="sr-only">' + escapeHtml(question.prompt) + "</legend>";
@@ -339,8 +381,8 @@
         answerMarkup += '<label class="q-choice"><input type="radio" name="' + escapeHtml(question.id) + '" data-action="answer" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(option.value) + '"' + optionChecked + answerDisabled + '> <span>' + escapeHtml(option.label) + "</span></label>";
       });
       answerMarkup += "</fieldset>";
-      if (question.allow_freetext) {
-        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (!getSelectedOptionNeedsFreeText(question, value) ? " disabled" : answerDisabled) + "></label>";
+      if (question.allow_freetext && getSelectedOptionNeedsFreeText(question, value)) {
+        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
       }
     } else if (question.type === "dropdown") {
       answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><select data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + answerDisabled + ">";
@@ -350,8 +392,8 @@
         answerMarkup += '<option value="' + escapeHtml(option.value) + '"' + selected + ">" + escapeHtml(option.label) + "</option>";
       });
       answerMarkup += "</select></label>";
-      if (question.allow_freetext) {
-        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (!getSelectedOptionNeedsFreeText(question, value) ? " disabled" : answerDisabled) + "></label>";
+      if (question.allow_freetext && getSelectedOptionNeedsFreeText(question, value)) {
+        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
       }
     } else if (question.type === "text" || question.type === "editable_predefined_text") {
       var textValue = value || "";
@@ -382,6 +424,9 @@
   };
 
   QuestionnaireApp.prototype.renderReviewControls = function (question) {
+    if (this.role !== "reviewer") {
+      return "";
+    }
     var disabled = this.role === "reviewer" ? "" : " disabled";
     var options = REVIEW_STATUSES.map(function (status) {
       var selected = question.review_status === status ? " selected" : "";
@@ -460,16 +505,17 @@
         });
         if (element.tagName === "TEXTAREA" || (element.tagName === "INPUT" && element.type === "text")) {
           element.addEventListener("input", function (event) {
-            self.handleQuestionInput(event.target.getAttribute("data-question-id"), { value: event.target.value });
+            self.handleLiveTextInput(event.target.getAttribute("data-question-id"), {
+              kind: "answer",
+              value: event.target.value
+            });
           });
         }
       } else if (action === "freetext") {
         element.addEventListener("input", function (event) {
-          var questionId = event.target.getAttribute("data-question-id");
-          var question = self.questionsById[questionId];
-          self.handleQuestionInput(questionId, {
-            value: getQuestionBaseValue(question),
-            freetext: event.target.value
+          self.handleLiveTextInput(event.target.getAttribute("data-question-id"), {
+            kind: "freetext",
+            value: event.target.value
           });
         });
       } else if (action === "review-status") {
@@ -478,7 +524,10 @@
         });
       } else if (action === "review-comment") {
         element.addEventListener("input", function (event) {
-          self.handleReviewInput(event.target.getAttribute("data-question-id"), "reviewer_comment", event.target.value);
+          self.handleLiveTextInput(event.target.getAttribute("data-question-id"), {
+            kind: "reviewer_comment",
+            value: event.target.value
+          });
         });
       } else if (action === "prev") {
         element.addEventListener("click", function () {

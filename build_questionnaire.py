@@ -7,27 +7,8 @@ import argparse
 import html
 import json
 from pathlib import Path
-from typing import Any
 
-import yaml
-
-
-def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
-
-
-def load_questionnaire(path: Path) -> dict[str, Any]:
-    raw = read_text(path)
-    suffix = path.suffix.lower()
-    if suffix == ".json":
-      data = json.loads(raw)
-    elif suffix in {".yaml", ".yml"}:
-      data = yaml.safe_load(raw)
-    else:
-      raise ValueError(f"Unsupported questionnaire format: {path.suffix}")
-    if not isinstance(data, dict):
-      raise ValueError("Questionnaire file must contain a top-level object.")
-    return data
+from questionnaire_utils import load_questionnaire, normalize_questionnaire, read_text
 
 
 def replace_script_endings(text: str) -> str:
@@ -50,6 +31,7 @@ def build_html(
     role: str,
 ) -> None:
     questionnaire = load_questionnaire(questionnaire_path)
+    questionnaire = normalize_questionnaire(questionnaire)
     template = read_text(template_path)
     javascript = replace_script_endings(read_text(javascript_path))
     css = replace_script_endings(read_text(css_path))

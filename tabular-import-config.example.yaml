@@ -1,0 +1,18 @@
+questionnaire:
+  id: imported-questionnaire
+  title: Imported Questionnaire
+  version: "1.0"
+
+columns:
+  prompt: Prompt
+  type: Type
+  help: Help
+  required: Required
+  default: Default
+  allow_freetext: AllowFreeText
+  options: Options
+  multiline: Multiline
+  page_title: Page
+
+page_group_by: title
+option_delimiter: "|"
