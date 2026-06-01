@@ -112,6 +112,24 @@ textarea {
   margin: 22px 0 0;
 }
 
+.q-flash {
+  margin-top: 18px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--q-border);
+  background: #ffffff;
+  box-shadow: var(--q-shadow);
+}
+
+.q-flash-success {
+  background: var(--q-accent-soft);
+}
+
+.q-flash-error {
+  background: #fff1ef;
+  color: var(--q-danger);
+}
+
 .q-page-tab {
   border: 1px solid var(--q-border);
   background: #ffffff;

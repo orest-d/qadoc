@@ -485,6 +485,26 @@ Loading state must:
 
 Because the saved file uses the same format as the questionnaire itself, loading should replace the current in-memory questionnaire object with the loaded one after validation.
 
+### 10.3 HTML Load Mechanism
+
+The generated standalone HTML file must provide a direct way to load a questionnaire JSON file from the local machine.
+
+The recommended mechanism is:
+
+1. A visible `Load JSON` control in the HTML UI.
+2. A browser file picker restricted to `.json` files.
+3. Client-side reading of the selected file using `FileReader` or an equivalent browser API.
+4. Parsing the file as JSON.
+5. Validation and normalization of the loaded object using the same rules as initial questionnaire loading.
+6. Replacement of the current in-memory questionnaire object with the loaded object.
+7. Immediate re-render of the questionnaire UI.
+
+The generated HTML must not upload the selected file anywhere.
+
+If loading fails, the UI must display a clear client-side error message.
+
+If loading succeeds, the UI should display a short confirmation message.
+
 ## 11. Download and Export
 
 The application must support saving and loading the current questionnaire state entirely on the client.
@@ -498,6 +518,7 @@ The application must support saving and loading the current questionnaire state 
 - Allow the user to download a `.json` file.
 - Provide a load action that lets the user choose a previously saved `.json` file.
 - Parse the selected file in the browser and restore state without any server interaction.
+- Show a clear success or error message after a load attempt.
 
 ### 11.2 Suggested Implementation
 

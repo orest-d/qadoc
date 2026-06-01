@@ -134,6 +134,8 @@
     this.spec = deepClone(config.spec);
     this.currentPageIndex = 0;
     this.validationErrors = {};
+    this.flashMessage = "";
+    this.flashMessageType = "";
     this.questionsById = {};
     this.initialize();
   }
@@ -276,6 +278,11 @@
     this.render();
   };
 
+  QuestionnaireApp.prototype.setFlashMessage = function (message, type) {
+    this.flashMessage = message || "";
+    this.flashMessageType = type || "";
+  };
+
   QuestionnaireApp.prototype.handleQuestionInput = function (questionId, payload) {
     var question = this.questionsById[questionId];
     if (!question) {
@@ -342,16 +349,31 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    this.setFlashMessage("Questionnaire saved as JSON.", "success");
+    this.render();
   };
 
   QuestionnaireApp.prototype.loadStateFromText = function (text) {
-    var loaded = JSON.parse(text);
-    this.validateAndNormalize(loaded);
-    this.spec = loaded;
-    this.currentPageIndex = 0;
-    this.validationErrors = {};
-    this.rebuildQuestionIndex();
-    this.render();
+    try {
+      var loaded = JSON.parse(text);
+      this.validateAndNormalize(loaded);
+      this.spec = loaded;
+      this.currentPageIndex = 0;
+      this.validationErrors = {};
+      this.rebuildQuestionIndex();
+      this.setFlashMessage("Questionnaire JSON loaded successfully.", "success");
+      this.render();
+    } catch (error) {
+      this.setFlashMessage("Unable to load JSON: " + error.message, "error");
+      this.render();
+    }
+  };
+
+  QuestionnaireApp.prototype.renderFlashMessage = function () {
+    if (!this.flashMessage) {
+      return "";
+    }
+    return '<div class="q-flash q-flash-' + escapeHtml(this.flashMessageType || "info") + '">' + escapeHtml(this.flashMessage) + "</div>";
   };
 
   QuestionnaireApp.prototype.renderQuestion = function (question) {
@@ -466,6 +488,7 @@
       '<label class="q-load-button"><span>Load JSON</span><input type="file" accept="application/json,.json" data-action="load-file"></label>',
       "</div>",
       "</header>",
+      this.renderFlashMessage(),
       '<nav class="q-page-nav">' + this.renderPageTabs() + "</nav>",
       '<main class="q-main">',
       '<section class="q-page-intro">',
@@ -548,6 +571,10 @@
             return;
           }
           var reader = new FileReader();
+          reader.onerror = function () {
+            self.setFlashMessage("Unable to read the selected file.", "error");
+            self.render();
+          };
           reader.onload = function (loadEvent) {
             self.loadStateFromText(loadEvent.target.result);
           };
