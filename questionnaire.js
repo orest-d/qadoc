@@ -1,0 +1,529 @@
+(function () {
+  "use strict";
+
+  var REVIEW_STATUSES = ["pending", "satisfactory", "partial", "unsatisfactory"];
+
+  function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function ensureQuestionDefaults(question) {
+    if (!Object.prototype.hasOwnProperty.call(question, "default")) {
+      question.default = question.type === "checkbox" ? false : "";
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "allow_freetext")) {
+      question.allow_freetext = false;
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "answer")) {
+      question.answer = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "review_status")) {
+      question.review_status = "pending";
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "reviewer_comment")) {
+      question.reviewer_comment = "";
+    }
+  }
+
+  function getQuestionBaseValue(question) {
+    if (question.answer === null || typeof question.answer === "undefined" || question.answer === "") {
+      return question.default;
+    }
+    if (question.allow_freetext && question.answer && typeof question.answer === "object" && Object.prototype.hasOwnProperty.call(question.answer, "value")) {
+      return question.answer.value;
+    }
+    return question.answer;
+  }
+
+  function getQuestionFreeText(question) {
+    if (question.allow_freetext && question.answer && typeof question.answer === "object") {
+      return question.answer.freetext || "";
+    }
+    return "";
+  }
+
+  function setQuestionAnswer(question, value, freetext) {
+    if (question.allow_freetext && (question.type === "checkbox" || question.type === "radio" || question.type === "dropdown")) {
+      question.answer = {
+        value: value,
+        freetext: freetext || ""
+      };
+      return;
+    }
+    question.answer = value;
+  }
+
+  function questionHasMeaningfulValue(question) {
+    var value = getQuestionBaseValue(question);
+    if (question.type === "checkbox") {
+      return value === true || value === false;
+    }
+    if (question.type === "text" || question.type === "editable_predefined_text") {
+      return String(value || "").trim().length > 0;
+    }
+    if (question.type === "radio" || question.type === "dropdown") {
+      return String(value || "").trim().length > 0;
+    }
+    return value !== null && typeof value !== "undefined";
+  }
+
+  function getSelectedOptionNeedsFreeText(question, value) {
+    if (!Array.isArray(question.options)) {
+      return false;
+    }
+    for (var i = 0; i < question.options.length; i += 1) {
+      if (question.options[i].value === value) {
+        return !!question.options[i].isOther;
+      }
+    }
+    return false;
+  }
+
+  function evaluateCondition(condition, questionsById) {
+    if (!condition) {
+      return true;
+    }
+    if (Array.isArray(condition.all)) {
+      return condition.all.every(function (item) {
+        return evaluateCondition(item, questionsById);
+      });
+    }
+    if (Array.isArray(condition.any)) {
+      return condition.any.some(function (item) {
+        return evaluateCondition(item, questionsById);
+      });
+    }
+    var question = questionsById[condition.questionId];
+    if (!question) {
+      return false;
+    }
+    var value = getQuestionBaseValue(question);
+    if (Object.prototype.hasOwnProperty.call(condition, "equals")) {
+      return value === condition.equals;
+    }
+    if (Object.prototype.hasOwnProperty.call(condition, "notEquals")) {
+      return value !== condition.notEquals;
+    }
+    if (Object.prototype.hasOwnProperty.call(condition, "contains")) {
+      return String(value || "").indexOf(String(condition.contains)) !== -1;
+    }
+    return false;
+  }
+
+  function QuestionnaireApp(config) {
+    this.container = config.container;
+    this.role = config.role || "interviewed";
+    this.spec = deepClone(config.spec);
+    this.currentPageIndex = 0;
+    this.validationErrors = {};
+    this.questionsById = {};
+    this.initialize();
+  }
+
+  QuestionnaireApp.prototype.initialize = function () {
+    this.validateAndNormalize(this.spec);
+    this.rebuildQuestionIndex();
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.rebuildQuestionIndex = function () {
+    this.questionsById = {};
+    var pages = this.spec.pages || [];
+    for (var i = 0; i < pages.length; i += 1) {
+      var questions = pages[i].questions || [];
+      for (var j = 0; j < questions.length; j += 1) {
+        this.questionsById[questions[j].id] = questions[j];
+      }
+    }
+  };
+
+  QuestionnaireApp.prototype.validateAndNormalize = function (spec) {
+    if (!spec || typeof spec !== "object") {
+      throw new Error("Questionnaire spec must be an object.");
+    }
+    if (!Array.isArray(spec.pages)) {
+      throw new Error("Questionnaire spec must contain a pages array.");
+    }
+    var seenIds = {};
+    for (var i = 0; i < spec.pages.length; i += 1) {
+      var page = spec.pages[i];
+      if (!Array.isArray(page.questions)) {
+        page.questions = [];
+      }
+      for (var j = 0; j < page.questions.length; j += 1) {
+        var question = page.questions[j];
+        if (!question.id) {
+          throw new Error("Each question must have an id.");
+        }
+        if (seenIds[question.id]) {
+          throw new Error("Duplicate question id: " + question.id);
+        }
+        seenIds[question.id] = true;
+        if (["radio", "dropdown"].indexOf(question.type) !== -1 && !Array.isArray(question.options)) {
+          throw new Error("Question " + question.id + " must define options.");
+        }
+        if (question.type === "editable_predefined_text" && !Object.prototype.hasOwnProperty.call(question, "predefinedText")) {
+          question.predefinedText = question.default || "";
+        }
+        ensureQuestionDefaults(question);
+        if (REVIEW_STATUSES.indexOf(question.review_status) === -1) {
+          question.review_status = "pending";
+        }
+      }
+    }
+    for (var pageIndex = 0; pageIndex < spec.pages.length; pageIndex += 1) {
+      var questions = spec.pages[pageIndex].questions || [];
+      for (var questionIndex = 0; questionIndex < questions.length; questionIndex += 1) {
+        this.validateConditionReferences(questions[questionIndex].visibleIf, seenIds, questions[questionIndex].id);
+      }
+    }
+  };
+
+  QuestionnaireApp.prototype.validateConditionReferences = function (condition, seenIds, currentId) {
+    if (!condition) {
+      return;
+    }
+    if (Array.isArray(condition.all)) {
+      for (var i = 0; i < condition.all.length; i += 1) {
+        this.validateConditionReferences(condition.all[i], seenIds, currentId);
+      }
+      return;
+    }
+    if (Array.isArray(condition.any)) {
+      for (var j = 0; j < condition.any.length; j += 1) {
+        this.validateConditionReferences(condition.any[j], seenIds, currentId);
+      }
+      return;
+    }
+    if (condition.questionId && !seenIds[condition.questionId]) {
+      throw new Error("Question " + currentId + " references missing question id " + condition.questionId + ".");
+    }
+  };
+
+  QuestionnaireApp.prototype.isQuestionVisible = function (question) {
+    return evaluateCondition(question.visibleIf, this.questionsById);
+  };
+
+  QuestionnaireApp.prototype.getCurrentPage = function () {
+    return this.spec.pages[this.currentPageIndex] || { questions: [] };
+  };
+
+  QuestionnaireApp.prototype.collectPageValidationErrors = function (pageIndex) {
+    var errors = {};
+    var page = this.spec.pages[pageIndex];
+    if (!page) {
+      return errors;
+    }
+    var questions = page.questions || [];
+    for (var i = 0; i < questions.length; i += 1) {
+      var question = questions[i];
+      if (!this.isQuestionVisible(question)) {
+        continue;
+      }
+      if (question.required && !questionHasMeaningfulValue(question)) {
+        errors[question.id] = "This question is required.";
+      } else if (question.allow_freetext && (question.type === "radio" || question.type === "dropdown")) {
+        var baseValue = getQuestionBaseValue(question);
+        var freeText = getQuestionFreeText(question);
+        if (getSelectedOptionNeedsFreeText(question, baseValue) && !String(freeText).trim()) {
+          errors[question.id] = "Please provide additional details.";
+        }
+      }
+    }
+    return errors;
+  };
+
+  QuestionnaireApp.prototype.setRole = function (role) {
+    this.role = role;
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.handleQuestionInput = function (questionId, payload) {
+    var question = this.questionsById[questionId];
+    if (!question) {
+      return;
+    }
+    if (question.type === "checkbox") {
+      setQuestionAnswer(question, !!payload.value, payload.freetext || "");
+    } else if (question.type === "radio" || question.type === "dropdown") {
+      setQuestionAnswer(question, payload.value, payload.freetext || "");
+    } else {
+      question.answer = payload.value;
+    }
+    delete this.validationErrors[questionId];
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.handleReviewInput = function (questionId, field, value) {
+    var question = this.questionsById[questionId];
+    if (!question) {
+      return;
+    }
+    question[field] = value;
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.nextPage = function () {
+    this.validationErrors = this.collectPageValidationErrors(this.currentPageIndex);
+    if (Object.keys(this.validationErrors).length > 0) {
+      this.render();
+      return;
+    }
+    if (this.currentPageIndex < this.spec.pages.length - 1) {
+      this.currentPageIndex += 1;
+      this.render();
+    }
+  };
+
+  QuestionnaireApp.prototype.previousPage = function () {
+    if (this.currentPageIndex > 0) {
+      this.currentPageIndex -= 1;
+      this.render();
+    }
+  };
+
+  QuestionnaireApp.prototype.downloadState = function () {
+    var json = JSON.stringify(this.spec, null, 2);
+    var href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+    var link = document.createElement("a");
+    link.href = href;
+    link.download = (this.spec.id || "questionnaire") + ".json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  QuestionnaireApp.prototype.loadStateFromText = function (text) {
+    var loaded = JSON.parse(text);
+    this.validateAndNormalize(loaded);
+    this.spec = loaded;
+    this.currentPageIndex = 0;
+    this.validationErrors = {};
+    this.rebuildQuestionIndex();
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.renderQuestion = function (question) {
+    var visible = this.isQuestionVisible(question);
+    if (!visible) {
+      return "";
+    }
+    var isReviewer = this.role === "reviewer";
+    var answerDisabled = isReviewer ? " disabled" : "";
+    var value = getQuestionBaseValue(question);
+    var freeText = getQuestionFreeText(question);
+    var requiredBadge = question.required ? '<span class="q-required">Required</span>' : "";
+    var help = question.help ? '<p class="q-help">' + escapeHtml(question.help) + "</p>" : "";
+    var error = this.validationErrors[question.id] ? '<p class="q-error">' + escapeHtml(this.validationErrors[question.id]) + "</p>" : "";
+    var answerMarkup = "";
+
+    if (question.type === "checkbox") {
+      var checked = value === true ? " checked" : "";
+      answerMarkup += '<label class="q-choice"><input type="checkbox" data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + checked + answerDisabled + '> <span>' + escapeHtml(question.prompt) + "</span></label>";
+      if (question.allow_freetext) {
+        answerMarkup += '<label class="q-subfield"><span>Explanation</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (value === true ? " disabled" : answerDisabled) + "></label>";
+      }
+    } else if (question.type === "radio") {
+      answerMarkup += '<fieldset class="q-fieldset"><legend class="sr-only">' + escapeHtml(question.prompt) + "</legend>";
+      question.options.forEach(function (option) {
+        var optionChecked = value === option.value ? " checked" : "";
+        answerMarkup += '<label class="q-choice"><input type="radio" name="' + escapeHtml(question.id) + '" data-action="answer" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(option.value) + '"' + optionChecked + answerDisabled + '> <span>' + escapeHtml(option.label) + "</span></label>";
+      });
+      answerMarkup += "</fieldset>";
+      if (question.allow_freetext) {
+        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (!getSelectedOptionNeedsFreeText(question, value) ? " disabled" : answerDisabled) + "></label>";
+      }
+    } else if (question.type === "dropdown") {
+      answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><select data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + answerDisabled + ">";
+      answerMarkup += '<option value="">Select an option</option>';
+      question.options.forEach(function (option) {
+        var selected = value === option.value ? " selected" : "";
+        answerMarkup += '<option value="' + escapeHtml(option.value) + '"' + selected + ">" + escapeHtml(option.label) + "</option>";
+      });
+      answerMarkup += "</select></label>";
+      if (question.allow_freetext) {
+        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + (!getSelectedOptionNeedsFreeText(question, value) ? " disabled" : answerDisabled) + "></label>";
+      }
+    } else if (question.type === "text" || question.type === "editable_predefined_text") {
+      var textValue = value || "";
+      if (question.multiline || question.type === "editable_predefined_text") {
+        answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + "</span><textarea data-action=\"answer\" data-question-id=\"" + escapeHtml(question.id) + "\"" + answerDisabled + ">" + escapeHtml(textValue) + "</textarea></label>";
+      } else {
+        answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><input type="text" data-action="answer" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(textValue) + '"' + answerDisabled + "></label>";
+      }
+      if (question.type === "editable_predefined_text" && question.predefinedText) {
+        answerMarkup += '<p class="q-help">Default text: ' + escapeHtml(question.predefinedText) + "</p>";
+      }
+    } else {
+      answerMarkup += '<p class="q-error">Unsupported question type: ' + escapeHtml(question.type) + "</p>";
+    }
+
+    return [
+      '<section class="q-card" data-question="' + escapeHtml(question.id) + '">',
+      '<div class="q-card-head">',
+      '<h3 class="q-prompt">' + escapeHtml(question.prompt) + "</h3>",
+      requiredBadge,
+      "</div>",
+      help,
+      '<div class="q-answer-block">' + answerMarkup + "</div>",
+      error,
+      this.renderReviewControls(question),
+      "</section>"
+    ].join("");
+  };
+
+  QuestionnaireApp.prototype.renderReviewControls = function (question) {
+    var disabled = this.role === "reviewer" ? "" : " disabled";
+    var options = REVIEW_STATUSES.map(function (status) {
+      var selected = question.review_status === status ? " selected" : "";
+      return '<option value="' + escapeHtml(status) + '"' + selected + ">" + escapeHtml(status) + "</option>";
+    }).join("");
+    return [
+      '<div class="q-review-panel">',
+      '<label class="q-review-field"><span>Review status</span><select data-action="review-status" data-question-id="' + escapeHtml(question.id) + '"' + disabled + ">" + options + "</select></label>",
+      '<label class="q-review-field"><span>Reviewer comment</span><textarea data-action="review-comment" data-question-id="' + escapeHtml(question.id) + '"' + disabled + ">" + escapeHtml(question.reviewer_comment || "") + "</textarea></label>",
+      "</div>"
+    ].join("");
+  };
+
+  QuestionnaireApp.prototype.renderPageTabs = function () {
+    var self = this;
+    return (this.spec.pages || []).map(function (page, index) {
+      var current = index === self.currentPageIndex ? " is-current" : "";
+      return '<button type="button" class="q-page-tab' + current + '" data-action="go-page" data-page-index="' + index + '">' + escapeHtml((index + 1) + ". " + page.title) + "</button>";
+    }).join("");
+  };
+
+  QuestionnaireApp.prototype.render = function () {
+    var page = this.getCurrentPage();
+    var questionsMarkup = (page.questions || []).map(this.renderQuestion.bind(this)).join("");
+    var description = page.description ? '<p class="q-page-description">' + escapeHtml(page.description) + "</p>" : "";
+    this.container.innerHTML = [
+      '<div class="q-shell">',
+      '<header class="q-header">',
+      '<div>',
+      '<p class="q-kicker">Questionnaire</p>',
+      '<h1>' + escapeHtml(this.spec.title || "Untitled Questionnaire") + "</h1>",
+      '<p class="q-subtitle">Version ' + escapeHtml(this.spec.version || "1.0") + "</p>",
+      "</div>",
+      '<div class="q-toolbar">',
+      '<label><span>Role</span><select data-action="role-switch"><option value="interviewed"' + (this.role === "interviewed" ? " selected" : "") + '>Interviewed</option><option value="reviewer"' + (this.role === "reviewer" ? " selected" : "") + ">Reviewer</option></select></label>",
+      '<button type="button" data-action="save">Save JSON</button>',
+      '<label class="q-load-button"><span>Load JSON</span><input type="file" accept="application/json,.json" data-action="load-file"></label>',
+      "</div>",
+      "</header>",
+      '<nav class="q-page-nav">' + this.renderPageTabs() + "</nav>",
+      '<main class="q-main">',
+      '<section class="q-page-intro">',
+      '<div>',
+      '<p class="q-page-count">Page ' + (this.currentPageIndex + 1) + " of " + this.spec.pages.length + "</p>",
+      '<h2>' + escapeHtml(page.title || "Untitled Page") + "</h2>",
+      description,
+      "</div>",
+      "</section>",
+      '<section class="q-questions">' + questionsMarkup + "</section>",
+      "</main>",
+      '<footer class="q-footer">',
+      '<button type="button" data-action="prev"' + (this.currentPageIndex === 0 ? " disabled" : "") + ">Previous</button>",
+      '<button type="button" data-action="next">' + (this.currentPageIndex === this.spec.pages.length - 1 ? "Finish" : "Next") + "</button>",
+      "</footer>",
+      "</div>"
+    ].join("");
+    this.bindEvents();
+  };
+
+  QuestionnaireApp.prototype.bindEvents = function () {
+    var self = this;
+    this.container.querySelectorAll("[data-action]").forEach(function (element) {
+      var action = element.getAttribute("data-action");
+      if (action === "answer") {
+        element.addEventListener("change", function (event) {
+          var questionId = event.target.getAttribute("data-question-id");
+          var question = self.questionsById[questionId];
+          var payload = { value: event.target.value };
+          if (question.type === "checkbox") {
+            payload.value = event.target.checked;
+            payload.freetext = getQuestionFreeText(question);
+          } else if (question.type === "radio" || question.type === "dropdown") {
+            payload.freetext = getQuestionFreeText(question);
+          }
+          self.handleQuestionInput(questionId, payload);
+        });
+        if (element.tagName === "TEXTAREA" || (element.tagName === "INPUT" && element.type === "text")) {
+          element.addEventListener("input", function (event) {
+            self.handleQuestionInput(event.target.getAttribute("data-question-id"), { value: event.target.value });
+          });
+        }
+      } else if (action === "freetext") {
+        element.addEventListener("input", function (event) {
+          var questionId = event.target.getAttribute("data-question-id");
+          var question = self.questionsById[questionId];
+          self.handleQuestionInput(questionId, {
+            value: getQuestionBaseValue(question),
+            freetext: event.target.value
+          });
+        });
+      } else if (action === "review-status") {
+        element.addEventListener("change", function (event) {
+          self.handleReviewInput(event.target.getAttribute("data-question-id"), "review_status", event.target.value);
+        });
+      } else if (action === "review-comment") {
+        element.addEventListener("input", function (event) {
+          self.handleReviewInput(event.target.getAttribute("data-question-id"), "reviewer_comment", event.target.value);
+        });
+      } else if (action === "prev") {
+        element.addEventListener("click", function () {
+          self.previousPage();
+        });
+      } else if (action === "next") {
+        element.addEventListener("click", function () {
+          self.nextPage();
+        });
+      } else if (action === "save") {
+        element.addEventListener("click", function () {
+          self.downloadState();
+        });
+      } else if (action === "load-file") {
+        element.addEventListener("change", function (event) {
+          var file = event.target.files && event.target.files[0];
+          if (!file) {
+            return;
+          }
+          var reader = new FileReader();
+          reader.onload = function (loadEvent) {
+            self.loadStateFromText(loadEvent.target.result);
+          };
+          reader.readAsText(file);
+          event.target.value = "";
+        });
+      } else if (action === "role-switch") {
+        element.addEventListener("change", function (event) {
+          self.setRole(event.target.value);
+        });
+      } else if (action === "go-page") {
+        element.addEventListener("click", function (event) {
+          self.currentPageIndex = Number(event.target.getAttribute("data-page-index"));
+          self.render();
+        });
+      }
+    });
+  };
+
+  window.QuestionnaireRenderer = {
+    render: function (config) {
+      if (!config || !config.container || !config.spec) {
+        throw new Error("render() requires container and spec.");
+      }
+      return new QuestionnaireApp(config);
+    }
+  };
+}());

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{title}}</title>
+    <style>
+{{css}}
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script id="questionnaire-data" type="application/json">
+{{questionnaire_json}}
+    </script>
+    <script>
+{{javascript}}
+    </script>
+    <script>
+      (function () {
+        var dataElement = document.getElementById("questionnaire-data");
+        var spec = JSON.parse(dataElement.textContent);
+        QuestionnaireRenderer.render({
+          container: document.getElementById("app"),
+          spec: spec,
+          role: "{{role}}"
+        });
+      }());
+    </script>
+  </body>
+</html>

@@ -1,0 +1,103 @@
+id: onboarding-review
+title: Project Onboarding Questionnaire
+version: "1.0"
+pages:
+  - id: basics
+    title: General Information
+    description: Provide the baseline information for the interview.
+    questions:
+      - id: q_confirm_identity
+        type: checkbox
+        prompt: I confirm that my legal name is correct in the internal records.
+        help: Uncheck this box and add an explanation if the record must be corrected.
+        required: true
+        default: true
+        allow_freetext: true
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+      - id: q_employment_status
+        type: radio
+        prompt: What is your current employment status?
+        required: true
+        default: employed
+        allow_freetext: true
+        options:
+          - value: employed
+            label: Employed
+          - value: self_employed
+            label: Self-employed
+          - value: unemployed
+            label: Unemployed
+          - value: other
+            label: Other
+            isOther: true
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+      - id: q_country
+        type: dropdown
+        prompt: Select your primary country of residence.
+        required: true
+        default: ""
+        allow_freetext: true
+        options:
+          - value: no
+            label: Norway
+          - value: se
+            label: Sweden
+          - value: dk
+            label: Denmark
+          - value: other
+            label: Other
+            isOther: true
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+  - id: details
+    title: Supporting Details
+    description: Some of these questions appear only when relevant.
+    questions:
+      - id: q_accounting_support
+        type: checkbox
+        prompt: I work with an accountant or accounting advisor.
+        required: false
+        default: false
+        allow_freetext: false
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+      - id: q_accountant_name
+        type: text
+        prompt: What is your accountant's name?
+        multiline: false
+        required: true
+        default: ""
+        allow_freetext: false
+        visibleIf:
+          questionId: q_accounting_support
+          equals: true
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+      - id: q_statement
+        type: editable_predefined_text
+        prompt: Review and adjust the statement if needed.
+        help: The default text can be edited directly.
+        required: true
+        predefinedText: I confirm that the submitted information is complete and accurate.
+        default: I confirm that the submitted information is complete and accurate.
+        allow_freetext: false
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
+      - id: q_notes
+        type: text
+        prompt: Additional notes
+        multiline: true
+        required: false
+        default: ""
+        allow_freetext: false
+        answer: null
+        review_status: pending
+        reviewer_comment: ""
