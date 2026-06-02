@@ -1,4 +1,4 @@
-Prompt,Type,Help,Required,Default,AllowFreeText,Options,Page
-What is your full name?,text,,yes,,,,General
-Select your country,dropdown,,yes,,yes,"no=Norway|se=Sweden|other=Other",General
-Additional notes,text,Optional freeform context,no,,,,Details
+Prompt,Type,Help,Required,Default,AllowFreeText,Options,Multiline,TextareaRows,RuleOnValue,RuleStatus,Page
+What is your full name?,text,,yes,,,,,,,,General
+Select your country,dropdown,,yes,,yes,"no=Norway|se=Sweden|other=Other",true,4,other,partial,General
+Additional notes,text,Optional freeform context,no,,,,true,6,,,Details

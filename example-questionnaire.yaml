@@ -13,8 +13,13 @@ pages:
         required: true
         default: true
         allow_freetext: true
+        multiline: true
+        textarea_rows: 3
+        rule_on_value: false
+        rule_status: unsatisfactory
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
       - id: q_employment_status
         type: radio
@@ -22,6 +27,8 @@ pages:
         required: true
         default: employed
         allow_freetext: true
+        rule_on_value: unemployed
+        rule_status: partial
         options:
           - value: employed
             label: Employed
@@ -34,6 +41,7 @@ pages:
             isOther: true
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
       - id: q_country
         type: dropdown
@@ -41,6 +49,10 @@ pages:
         required: true
         default: ""
         allow_freetext: true
+        multiline: true
+        textarea_rows: 4
+        rule_on_value: other
+        rule_status: partial
         options:
           - value: no
             label: Norway
@@ -53,6 +65,7 @@ pages:
             isOther: true
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
   - id: details
     title: Supporting Details
@@ -66,6 +79,7 @@ pages:
         allow_freetext: false
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
       - id: q_accountant_name
         type: text
@@ -79,25 +93,30 @@ pages:
           equals: true
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
       - id: q_statement
         type: editable_predefined_text
         prompt: Review and adjust the statement if needed.
         help: The default text can be edited directly.
         required: true
+        textarea_rows: 5
         predefinedText: I confirm that the submitted information is complete and accurate.
         default: I confirm that the submitted information is complete and accurate.
         allow_freetext: false
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""
       - id: q_notes
         type: text
         prompt: Additional notes
         multiline: true
+        textarea_rows: 6
         required: false
         default: ""
         allow_freetext: false
         answer: null
         review_status: pending
+        review_status_by_rule: false
         reviewer_comment: ""

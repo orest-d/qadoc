@@ -12,6 +12,9 @@ columns:
   allow_freetext: AllowFreeText
   options: Options
   multiline: Multiline
+  textarea_rows: TextareaRows
+  rule_on_value: RuleOnValue
+  rule_status: RuleStatus
   page_title: Page
 
 page_group_by: title

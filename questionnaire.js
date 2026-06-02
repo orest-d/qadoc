@@ -16,6 +16,46 @@
       .replace(/'/g, "&#39;");
   }
 
+  function escapeScriptData(value) {
+    return String(value)
+      .replace(/<\/script/gi, "<\\/script")
+      .replace(/<\/style/gi, "<\\/style");
+  }
+
+  function downloadText(filename, mimeType, text) {
+    var link = document.createElement("a");
+    var objectUrl = null;
+    if (window.Blob && window.URL && window.URL.createObjectURL) {
+      objectUrl = window.URL.createObjectURL(new Blob([text], { type: mimeType + ";charset=utf-8" }));
+      link.href = objectUrl;
+    } else {
+      link.href = "data:" + mimeType + ";charset=utf-8," + encodeURIComponent(text);
+    }
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    if (objectUrl) {
+      window.setTimeout(function () {
+        window.URL.revokeObjectURL(objectUrl);
+      }, 0);
+    }
+  }
+
+  function serializeDoctype(doctype) {
+    if (!doctype) {
+      return "<!DOCTYPE html>";
+    }
+    var text = "<!DOCTYPE " + doctype.name;
+    if (doctype.publicId) {
+      text += ' PUBLIC "' + doctype.publicId + '"';
+    }
+    if (doctype.systemId) {
+      text += ' "' + doctype.systemId + '"';
+    }
+    return text + ">";
+  }
+
   function ensureQuestionDefaults(question) {
     if (!Object.prototype.hasOwnProperty.call(question, "prompt")) {
       question.prompt = "";
@@ -38,6 +78,9 @@
     if (!Object.prototype.hasOwnProperty.call(question, "review_status")) {
       question.review_status = "pending";
     }
+    if (!Object.prototype.hasOwnProperty.call(question, "review_status_by_rule")) {
+      question.review_status_by_rule = false;
+    }
     if (!Object.prototype.hasOwnProperty.call(question, "reviewer_comment")) {
       question.reviewer_comment = "";
     }
@@ -58,6 +101,22 @@
       return question.answer.freetext || "";
     }
     return "";
+  }
+
+  function getTextareaRows(question) {
+    var rows = parseInt(question.textarea_rows, 10);
+    if (isNaN(rows)) {
+      return 4;
+    }
+    return Math.max(1, Math.min(rows, 30));
+  }
+
+  function renderFreeTextControl(question, label, value, disabled) {
+    var questionId = escapeHtml(question.id);
+    if (question.multiline) {
+      return '<label class="q-subfield"><span>' + escapeHtml(label) + '</span><textarea data-action="freetext" data-question-id="' + questionId + '" rows="' + getTextareaRows(question) + '"' + disabled + ">" + escapeHtml(value) + "</textarea></label>";
+    }
+    return '<label class="q-subfield"><span>' + escapeHtml(label) + '</span><input type="text" data-action="freetext" data-question-id="' + questionId + '" value="' + escapeHtml(value) + '"' + disabled + "></label>";
   }
 
   function setQuestionAnswer(question, value, freetext) {
@@ -95,6 +154,33 @@
       }
     }
     return false;
+  }
+
+  function questionHasReviewRule(question) {
+    return Object.prototype.hasOwnProperty.call(question, "rule_on_value") && REVIEW_STATUSES.indexOf(question.rule_status) !== -1;
+  }
+
+  function valuesMatch(left, right) {
+    return left === right;
+  }
+
+  function applyReviewRule(question) {
+    if (!questionHasReviewRule(question)) {
+      question.review_status_by_rule = false;
+      return;
+    }
+    var matches = valuesMatch(getQuestionBaseValue(question), question.rule_on_value);
+    if (question.review_status_by_rule && !matches) {
+      question.review_status = "pending";
+      question.review_status_by_rule = false;
+      return;
+    }
+    if (matches && (question.review_status === "pending" || question.review_status_by_rule) && question.rule_status !== "pending") {
+      question.review_status = question.rule_status;
+      question.review_status_by_rule = true;
+      return;
+    }
+    question.review_status_by_rule = false;
   }
 
   function evaluateCondition(condition, questionsById) {
@@ -143,6 +229,7 @@
   QuestionnaireApp.prototype.initialize = function () {
     this.validateAndNormalize(this.spec);
     this.rebuildQuestionIndex();
+    this.applyReviewRules();
     this.render();
   };
 
@@ -153,6 +240,16 @@
       var questions = pages[i].questions || [];
       for (var j = 0; j < questions.length; j += 1) {
         this.questionsById[questions[j].id] = questions[j];
+      }
+    }
+  };
+
+  QuestionnaireApp.prototype.applyReviewRules = function () {
+    var pages = this.spec.pages || [];
+    for (var i = 0; i < pages.length; i += 1) {
+      var questions = pages[i].questions || [];
+      for (var j = 0; j < questions.length; j += 1) {
+        applyReviewRule(questions[j]);
       }
     }
   };
@@ -208,6 +305,10 @@
         ensureQuestionDefaults(question);
         if (REVIEW_STATUSES.indexOf(question.review_status) === -1) {
           question.review_status = "pending";
+          question.review_status_by_rule = false;
+        }
+        if (question.review_status_by_rule && !questionHasReviewRule(question)) {
+          question.review_status_by_rule = false;
         }
       }
     }
@@ -295,6 +396,7 @@
     } else {
       question.answer = payload.value;
     }
+    applyReviewRule(question);
     delete this.validationErrors[questionId];
     this.render();
   };
@@ -305,6 +407,10 @@
       return;
     }
     question[field] = value;
+    if (field === "review_status") {
+      question.review_status_by_rule = false;
+      this.render();
+    }
   };
 
   QuestionnaireApp.prototype.handleLiveTextInput = function (questionId, payload) {
@@ -319,6 +425,7 @@
     } else {
       question.answer = payload.value;
     }
+    applyReviewRule(question);
   };
 
   QuestionnaireApp.prototype.nextPage = function () {
@@ -342,14 +449,23 @@
 
   QuestionnaireApp.prototype.downloadState = function () {
     var json = JSON.stringify(this.spec, null, 2);
-    var href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
-    var link = document.createElement("a");
-    link.href = href;
-    link.download = (this.spec.id || "questionnaire") + ".json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadText((this.spec.id || "questionnaire") + ".json", "application/json", json);
     this.setFlashMessage("Questionnaire saved as JSON.", "success");
+    this.render();
+  };
+
+  QuestionnaireApp.prototype.downloadHtml = function () {
+    var clone = document.documentElement.cloneNode(true);
+    var dataElement = clone.querySelector("#questionnaire-data");
+    if (!dataElement) {
+      this.setFlashMessage("Unable to save HTML: questionnaire data block was not found.", "error");
+      this.render();
+      return;
+    }
+    dataElement.textContent = "\n" + escapeScriptData(JSON.stringify(this.spec, null, 2)) + "\n    ";
+    var html = serializeDoctype(document.doctype) + "\n" + clone.outerHTML;
+    downloadText((this.spec.id || "questionnaire") + ".html", "text/html", html);
+    this.setFlashMessage("Questionnaire saved as HTML.", "success");
     this.render();
   };
 
@@ -361,6 +477,7 @@
       this.currentPageIndex = 0;
       this.validationErrors = {};
       this.rebuildQuestionIndex();
+      this.applyReviewRules();
       this.setFlashMessage("Questionnaire JSON loaded successfully.", "success");
       this.render();
     } catch (error) {
@@ -394,7 +511,7 @@
       var checked = value === true ? " checked" : "";
       answerMarkup += '<label class="q-choice"><input type="checkbox" data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + checked + answerDisabled + '> <span>' + escapeHtml(question.prompt) + "</span></label>";
       if (question.allow_freetext && value !== true) {
-        answerMarkup += '<label class="q-subfield"><span>Explanation</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
+        answerMarkup += renderFreeTextControl(question, "Explanation", freeText, answerDisabled);
       }
     } else if (question.type === "radio") {
       answerMarkup += '<fieldset class="q-fieldset"><legend class="sr-only">' + escapeHtml(question.prompt) + "</legend>";
@@ -404,7 +521,7 @@
       });
       answerMarkup += "</fieldset>";
       if (question.allow_freetext && getSelectedOptionNeedsFreeText(question, value)) {
-        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
+        answerMarkup += renderFreeTextControl(question, "Other details", freeText, answerDisabled);
       }
     } else if (question.type === "dropdown") {
       answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><select data-action="answer" data-question-id="' + escapeHtml(question.id) + '"' + answerDisabled + ">";
@@ -415,12 +532,12 @@
       });
       answerMarkup += "</select></label>";
       if (question.allow_freetext && getSelectedOptionNeedsFreeText(question, value)) {
-        answerMarkup += '<label class="q-subfield"><span>Other details</span><input type="text" data-action="freetext" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(freeText) + '"' + answerDisabled + "></label>";
+        answerMarkup += renderFreeTextControl(question, "Other details", freeText, answerDisabled);
       }
     } else if (question.type === "text" || question.type === "editable_predefined_text") {
       var textValue = value || "";
       if (question.multiline || question.type === "editable_predefined_text") {
-        answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + "</span><textarea data-action=\"answer\" data-question-id=\"" + escapeHtml(question.id) + "\"" + answerDisabled + ">" + escapeHtml(textValue) + "</textarea></label>";
+        answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><textarea data-action="answer" data-question-id="' + escapeHtml(question.id) + '" rows="' + getTextareaRows(question) + '"' + answerDisabled + ">" + escapeHtml(textValue) + "</textarea></label>";
       } else {
         answerMarkup += '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.prompt) + '</span><input type="text" data-action="answer" data-question-id="' + escapeHtml(question.id) + '" value="' + escapeHtml(textValue) + '"' + answerDisabled + "></label>";
       }
@@ -450,13 +567,15 @@
       return "";
     }
     var disabled = this.role === "reviewer" ? "" : " disabled";
+    var statusClass = "q-review-status q-review-status-" + escapeHtml(question.review_status || "pending");
+    var panelClass = "q-review-panel" + (question.review_status_by_rule ? " is-rule-applied" : "");
     var options = REVIEW_STATUSES.map(function (status) {
       var selected = question.review_status === status ? " selected" : "";
       return '<option value="' + escapeHtml(status) + '"' + selected + ">" + escapeHtml(status) + "</option>";
     }).join("");
     return [
-      '<div class="q-review-panel">',
-      '<label class="q-review-field"><span>Review status</span><select data-action="review-status" data-question-id="' + escapeHtml(question.id) + '"' + disabled + ">" + options + "</select></label>",
+      '<div class="' + panelClass + '">',
+      '<label class="q-review-field"><span>Review status</span><select class="' + statusClass + '" data-action="review-status" data-question-id="' + escapeHtml(question.id) + '"' + disabled + ">" + options + "</select></label>",
       '<label class="q-review-field"><span>Reviewer comment</span><textarea data-action="review-comment" data-question-id="' + escapeHtml(question.id) + '"' + disabled + ">" + escapeHtml(question.reviewer_comment || "") + "</textarea></label>",
       "</div>"
     ].join("");
@@ -484,8 +603,11 @@
       "</div>",
       '<div class="q-toolbar">',
       '<label><span>Role</span><select data-action="role-switch"><option value="interviewed"' + (this.role === "interviewed" ? " selected" : "") + '>Interviewed</option><option value="reviewer"' + (this.role === "reviewer" ? " selected" : "") + ">Reviewer</option></select></label>",
-      '<button type="button" data-action="save">Save JSON</button>',
-      '<label class="q-load-button"><span>Load JSON</span><input type="file" accept="application/json,.json" data-action="load-file"></label>',
+      '<div class="q-toolbar-actions">',
+      '<button type="button" class="q-toolbar-action" data-action="save">Save JSON</button>',
+      '<button type="button" class="q-toolbar-action" data-action="save-html">Save HTML</button>',
+      '<label class="q-toolbar-action q-load-button"><span>Load JSON</span><input type="file" accept="application/json,.json" data-action="load-file"></label>',
+      "</div>",
       "</div>",
       "</header>",
       this.renderFlashMessage(),
@@ -563,6 +685,10 @@
       } else if (action === "save") {
         element.addEventListener("click", function () {
           self.downloadState();
+        });
+      } else if (action === "save-html") {
+        element.addEventListener("click", function () {
+          self.downloadHtml();
         });
       } else if (action === "load-file") {
         element.addEventListener("change", function (event) {

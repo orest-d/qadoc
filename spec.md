@@ -21,6 +21,7 @@ In addition to the browser runtime, the project must include a Python build scri
 - Allow an interviewed user to answer questions.
 - Allow a reviewer to assign statuses to questions.
 - Allow saving the completed result as a JSON document via client-side download using a data URL.
+- Allow saving the completed result as a standalone HTML document with the current questionnaire data embedded.
 - Allow loading a previously saved JSON state back into the generated HTML document.
 - Produce a single standalone HTML file for delivery and use.
 
@@ -173,6 +174,8 @@ Each question must have:
 - optional visibility condition,
 - optional default value,
 - optional `allow_freetext` flag,
+- optional `multiline` flag and `textarea_rows` count for textarea rendering,
+- optional `rule_on_value` and `rule_status` fields for rule-based review status,
 - runtime state fields for answer and review information.
 
 ### 6.3 Supported Question Types
@@ -204,8 +207,11 @@ All question types must support the following shared parameters:
 
 - `default`
 - `allow_freetext`
+- `multiline`
+- `textarea_rows`
 - `answer`
 - `review_status`
+- `review_status_by_rule`
 - `reviewer_comment`
 
 #### `default`
@@ -233,6 +239,16 @@ The implementation must document the exact rendering behavior for `text`. The re
 - for `checkbox`, `allow_freetext` enables an optional explanation field,
 - for `text` and `editable_predefined_text`, the flag is accepted for schema consistency but has no additional UI effect unless explicitly configured by the embedding application.
 
+#### `multiline`
+
+The `multiline` field is a boolean flag that renders text entry as a textarea instead of a single-line input.
+
+For `text` and `editable_predefined_text`, it applies to the main answer control. For `checkbox`, `radio`, and `dropdown` questions with `allow_freetext: true`, it applies to the companion free-text control.
+
+#### `textarea_rows`
+
+The `textarea_rows` field optionally sets the number of visible rows for multiline textareas. Implementations should use a sensible default when omitted and clamp invalid or extreme values.
+
 #### `answer`
 
 The `answer` field represents the current interviewed response.
@@ -240,6 +256,10 @@ The `answer` field represents the current interviewed response.
 #### `review_status`
 
 The `review_status` field represents the current reviewer assessment.
+
+#### `review_status_by_rule`
+
+The `review_status_by_rule` field is a boolean runtime flag indicating whether the current review status was assigned by a rule.
 
 #### `reviewer_comment`
 
@@ -302,10 +322,21 @@ The exact labels may be configurable, but the default set above should be provid
 For each question, the saved state should support:
 
 - review status,
+- whether the review status was assigned by a rule,
 - optional reviewer note,
 - reviewer role metadata if provided by the host application.
 
-### 8.3 Role-Based UI
+### 8.3 Rule-Based Review Status
+
+A question may define `rule_on_value` and `rule_status`.
+
+When a question has both fields, the application should compare the current answer value with `rule_on_value`. If the review status is `pending` and the answer matches `rule_on_value`, the review status is changed to `rule_status` and `review_status_by_rule` is set to `true`.
+
+If no rule is applied, `review_status_by_rule` is `false`. Manual reviewer status changes clear `review_status_by_rule`.
+
+If a status previously assigned by rule no longer matches because the answer changes, the review status returns to `pending` and `review_status_by_rule` becomes `false`.
+
+### 8.4 Role-Based UI
 
 When role is `interviewed`:
 
@@ -317,6 +348,8 @@ When role is `reviewer`:
 - answers are visible,
 - review controls are enabled,
 - answer controls may be read-only by default.
+- status text is visually distinguished: `pending` black, `satisfactory` green, `partial` orange, and `unsatisfactory` red.
+- status values assigned by rule are visually indicated with a light blue review panel background.
 
 The embedding application may choose to allow a reviewer to edit answers, but that is not required by this specification.
 
@@ -468,6 +501,7 @@ The saved questionnaire JSON must preserve the content needed for later restorat
 - default values,
 - current answer values,
 - current review status values,
+- whether current review statuses were assigned by rule,
 - current reviewer comments,
 - predefined text values,
 - any review-related metadata configured in the questionnaire.
@@ -516,6 +550,7 @@ The application must support saving and loading the current questionnaire state 
 - Create a data URL with MIME type `application/json`.
 - Provide a download action through an HTML link or button.
 - Allow the user to download a `.json` file.
+- Allow the user to download a standalone `.html` file with the current questionnaire object embedded in the questionnaire data script block.
 - Provide a load action that lets the user choose a previously saved `.json` file.
 - Parse the selected file in the browser and restore state without any server interaction.
 - Show a clear success or error message after a load attempt.
@@ -532,6 +567,8 @@ const href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
 The resulting `href` can be assigned to a download link with a filename such as `questionnaire-response.json`.
 
 Loading may be implemented using a file input and `FileReader` or modern browser equivalents.
+
+For standalone HTML export, the implementation may serialize the current document and replace the contents of the `<script id="questionnaire-data" type="application/json">` element with the current questionnaire object. The embedded JSON must be escaped so it cannot accidentally terminate the script block. Opening the saved HTML file should restore the questionnaire from the embedded current state without requiring a separate JSON file.
 
 ## 12. Validation
 

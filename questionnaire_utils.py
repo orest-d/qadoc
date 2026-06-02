@@ -70,7 +70,13 @@ def normalize_questionnaire(data: dict[str, Any]) -> dict[str, Any]:
             question.setdefault("allow_freetext", False)
             question.setdefault("answer", None)
             question.setdefault("review_status", "pending")
+            question.setdefault("review_status_by_rule", False)
             question.setdefault("reviewer_comment", "")
+            if "textarea_rows" in question:
+                try:
+                    question["textarea_rows"] = max(1, min(int(question["textarea_rows"]), 30))
+                except (TypeError, ValueError):
+                    question["textarea_rows"] = 4
             if "default" not in question:
                 question["default"] = False if question.get("type") == "checkbox" else ""
             if question.get("type") in {"radio", "dropdown"} and "options" not in question:

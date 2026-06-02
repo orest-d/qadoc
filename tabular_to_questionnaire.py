@@ -59,6 +59,27 @@ def cell_to_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
+def cell_to_int(value: Any, default: int | None = None) -> int | None:
+    if value is None:
+        return default
+    if pd.isna(value):
+        return default
+    text = str(value).strip()
+    if not text:
+        return default
+    try:
+        return int(float(text))
+    except ValueError:
+        return default
+
+
+def cell_to_rule_value(value: Any, question_type: str) -> Any:
+    text = cell_to_text(value)
+    if question_type == "checkbox":
+        return cell_to_bool(value, default=False)
+    return text
+
+
 def parse_options(text: str, delimiter: str) -> list[dict[str, Any]]:
     if not text:
         return []
@@ -100,6 +121,7 @@ def build_question_from_row(
         "allow_freetext": cell_to_bool(row.get(columns.get("allow_freetext", "")), default=False),
         "answer": None,
         "review_status": "pending",
+        "review_status_by_rule": False,
         "reviewer_comment": "",
     }
 
@@ -117,6 +139,24 @@ def build_question_from_row(
     multiline_column = columns.get("multiline")
     if multiline_column:
         question["multiline"] = cell_to_bool(row.get(multiline_column), default=False)
+
+    textarea_rows_column = columns.get("textarea_rows")
+    if textarea_rows_column:
+        textarea_rows = cell_to_int(row.get(textarea_rows_column))
+        if textarea_rows is not None:
+            question["textarea_rows"] = textarea_rows
+
+    rule_on_value_column = columns.get("rule_on_value")
+    if rule_on_value_column:
+        rule_on_value = cell_to_text(row.get(rule_on_value_column))
+        if rule_on_value:
+            question["rule_on_value"] = cell_to_rule_value(row.get(rule_on_value_column), question_type)
+
+    rule_status_column = columns.get("rule_status")
+    if rule_status_column:
+        rule_status = cell_to_text(row.get(rule_status_column))
+        if rule_status:
+            question["rule_status"] = rule_status
 
     predefined_text_column = columns.get("predefinedText")
     if predefined_text_column:
