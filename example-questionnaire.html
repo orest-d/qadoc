@@ -213,6 +213,10 @@ textarea {
   box-shadow: var(--q-shadow);
 }
 
+.q-card.is-reviewer-question {
+  background: var(--q-accent-soft);
+}
+
 .q-card-head {
   display: flex;
   justify-content: space-between;
@@ -406,7 +410,8 @@ textarea:focus-visible {
           "review_status_by_rule": false,
           "reviewer_comment": "",
           "title": "",
-          "description": ""
+          "description": "",
+          "reviewer_question": false
         },
         {
           "id": "q_employment_status",
@@ -442,7 +447,8 @@ textarea:focus-visible {
           "reviewer_comment": "",
           "title": "",
           "description": "",
-          "help": ""
+          "help": "",
+          "reviewer_question": false
         },
         {
           "id": "q_country",
@@ -480,7 +486,8 @@ textarea:focus-visible {
           "reviewer_comment": "",
           "title": "",
           "description": "",
-          "help": ""
+          "help": "",
+          "reviewer_question": false
         }
       ]
     },
@@ -502,7 +509,8 @@ textarea:focus-visible {
           "reviewer_comment": "",
           "title": "",
           "description": "",
-          "help": ""
+          "help": "",
+          "reviewer_question": false
         },
         {
           "id": "q_accountant_name",
@@ -522,7 +530,8 @@ textarea:focus-visible {
           "reviewer_comment": "",
           "title": "",
           "description": "",
-          "help": ""
+          "help": "",
+          "reviewer_question": false
         },
         {
           "id": "q_statement",
@@ -534,6 +543,39 @@ textarea:focus-visible {
           "predefinedText": "I confirm that the submitted information is complete and accurate.",
           "default": "I confirm that the submitted information is complete and accurate.",
           "allow_freetext": false,
+          "answer": null,
+          "review_status": "pending",
+          "review_status_by_rule": false,
+          "reviewer_comment": "",
+          "title": "",
+          "description": "",
+          "reviewer_question": false
+        },
+        {
+          "id": "q_reviewer_risk",
+          "type": "radio",
+          "prompt": "Reviewer risk rating",
+          "help": "This question is hidden from the interviewed role and editable for reviewers.",
+          "reviewer_question": true,
+          "required": false,
+          "default": "",
+          "allow_freetext": false,
+          "rule_on_value": "high",
+          "rule_status": "unsatisfactory",
+          "options": [
+            {
+              "value": "low",
+              "label": "Low"
+            },
+            {
+              "value": "medium",
+              "label": "Medium"
+            },
+            {
+              "value": "high",
+              "label": "High"
+            }
+          ],
           "answer": null,
           "review_status": "pending",
           "review_status_by_rule": false,
@@ -556,7 +598,8 @@ textarea:focus-visible {
           "reviewer_comment": "",
           "title": "",
           "description": "",
-          "help": ""
+          "help": "",
+          "reviewer_question": false
         }
       ]
     }
@@ -637,6 +680,9 @@ textarea:focus-visible {
     }
     if (!Object.prototype.hasOwnProperty.call(question, "allow_freetext")) {
       question.allow_freetext = false;
+    }
+    if (!Object.prototype.hasOwnProperty.call(question, "reviewer_question")) {
+      question.reviewer_question = false;
     }
     if (!Object.prototype.hasOwnProperty.call(question, "answer")) {
       question.answer = null;
@@ -731,22 +777,25 @@ textarea:focus-visible {
   }
 
   function applyReviewRule(question) {
+    var previousStatus = question.review_status;
+    var previousByRule = !!question.review_status_by_rule;
     if (!questionHasReviewRule(question)) {
       question.review_status_by_rule = false;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     var matches = valuesMatch(getQuestionBaseValue(question), question.rule_on_value);
     if (question.review_status_by_rule && !matches) {
       question.review_status = "pending";
       question.review_status_by_rule = false;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     if (matches && (question.review_status === "pending" || question.review_status_by_rule) && question.rule_status !== "pending") {
       question.review_status = question.rule_status;
       question.review_status_by_rule = true;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     question.review_status_by_rule = false;
+    return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
   }
 
   function evaluateCondition(condition, questionsById) {
@@ -908,6 +957,9 @@ textarea:focus-visible {
   };
 
   QuestionnaireApp.prototype.isQuestionVisible = function (question) {
+    if (question.reviewer_question && this.role !== "reviewer") {
+      return false;
+    }
     return evaluateCondition(question.visibleIf, this.questionsById);
   };
 
@@ -991,7 +1043,10 @@ textarea:focus-visible {
     } else {
       question.answer = payload.value;
     }
-    applyReviewRule(question);
+    var ruleChanged = applyReviewRule(question);
+    if (ruleChanged && payload.kind !== "reviewer_comment") {
+      this.render();
+    }
   };
 
   QuestionnaireApp.prototype.nextPage = function () {
@@ -1065,7 +1120,7 @@ textarea:focus-visible {
       return "";
     }
     var isReviewer = this.role === "reviewer";
-    var answerDisabled = isReviewer ? " disabled" : "";
+    var answerDisabled = isReviewer && !question.reviewer_question ? " disabled" : "";
     var value = getQuestionBaseValue(question);
     var freeText = getQuestionFreeText(question);
     var requiredBadge = question.required ? '<span class="q-required">Required</span>' : "";
@@ -1113,9 +1168,10 @@ textarea:focus-visible {
     } else {
       answerMarkup += '<p class="q-error">Unsupported question type: ' + escapeHtml(question.type) + "</p>";
     }
+    var cardClass = "q-card" + (question.reviewer_question ? " is-reviewer-question" : "");
 
     return [
-      '<section class="q-card" data-question="' + escapeHtml(question.id) + '">',
+      '<section class="' + cardClass + '" data-question="' + escapeHtml(question.id) + '">',
       '<div class="q-card-head">',
       '<h3 class="q-prompt">' + escapeHtml(question.prompt) + "</h3>",
       requiredBadge,

@@ -68,6 +68,7 @@ def normalize_questionnaire(data: dict[str, Any]) -> dict[str, Any]:
             question.setdefault("help", "")
             question.setdefault("required", False)
             question.setdefault("allow_freetext", False)
+            question.setdefault("reviewer_question", False)
             question.setdefault("answer", None)
             question.setdefault("review_status", "pending")
             question.setdefault("review_status_by_rule", False)

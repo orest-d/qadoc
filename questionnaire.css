@@ -206,6 +206,10 @@ textarea {
   box-shadow: var(--q-shadow);
 }
 
+.q-card.is-reviewer-question {
+  background: var(--q-accent-soft);
+}
+
 .q-card-head {
   display: flex;
   justify-content: space-between;

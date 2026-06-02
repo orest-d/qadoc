@@ -119,6 +119,7 @@ def build_question_from_row(
         "required": cell_to_bool(row.get(columns.get("required", "")), default=False),
         "default": cell_to_text(row.get(columns.get("default", ""))),
         "allow_freetext": cell_to_bool(row.get(columns.get("allow_freetext", "")), default=False),
+        "reviewer_question": cell_to_bool(row.get(columns.get("reviewer_question", "")), default=False),
         "answer": None,
         "review_status": "pending",
         "review_status_by_rule": False,

@@ -1,4 +1,5 @@
-Prompt,Type,Help,Required,Default,AllowFreeText,Options,Multiline,TextareaRows,RuleOnValue,RuleStatus,Page
-What is your full name?,text,,yes,,,,,,,,General
-Select your country,dropdown,,yes,,yes,"no=Norway|se=Sweden|other=Other",true,4,other,partial,General
-Additional notes,text,Optional freeform context,no,,,,true,6,,,Details
+Prompt,Type,Help,Required,Default,AllowFreeText,ReviewerQuestion,Options,Multiline,TextareaRows,RuleOnValue,RuleStatus,Page
+What is your full name?,text,,yes,,,,,,,,,General
+Select your country,dropdown,,yes,,yes,,"no=Norway|se=Sweden|other=Other",true,4,other,partial,General
+Reviewer risk rating,radio,Only reviewers answer this,no,,no,yes,"low=Low|medium=Medium|high=High",,,high,unsatisfactory,Details
+Additional notes,text,Optional freeform context,no,,,,,true,6,,,Details

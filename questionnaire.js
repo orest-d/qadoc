@@ -72,6 +72,9 @@
     if (!Object.prototype.hasOwnProperty.call(question, "allow_freetext")) {
       question.allow_freetext = false;
     }
+    if (!Object.prototype.hasOwnProperty.call(question, "reviewer_question")) {
+      question.reviewer_question = false;
+    }
     if (!Object.prototype.hasOwnProperty.call(question, "answer")) {
       question.answer = null;
     }
@@ -165,22 +168,25 @@
   }
 
   function applyReviewRule(question) {
+    var previousStatus = question.review_status;
+    var previousByRule = !!question.review_status_by_rule;
     if (!questionHasReviewRule(question)) {
       question.review_status_by_rule = false;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     var matches = valuesMatch(getQuestionBaseValue(question), question.rule_on_value);
     if (question.review_status_by_rule && !matches) {
       question.review_status = "pending";
       question.review_status_by_rule = false;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     if (matches && (question.review_status === "pending" || question.review_status_by_rule) && question.rule_status !== "pending") {
       question.review_status = question.rule_status;
       question.review_status_by_rule = true;
-      return;
+      return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
     }
     question.review_status_by_rule = false;
+    return previousStatus !== question.review_status || previousByRule !== !!question.review_status_by_rule;
   }
 
   function evaluateCondition(condition, questionsById) {
@@ -342,6 +348,9 @@
   };
 
   QuestionnaireApp.prototype.isQuestionVisible = function (question) {
+    if (question.reviewer_question && this.role !== "reviewer") {
+      return false;
+    }
     return evaluateCondition(question.visibleIf, this.questionsById);
   };
 
@@ -425,7 +434,10 @@
     } else {
       question.answer = payload.value;
     }
-    applyReviewRule(question);
+    var ruleChanged = applyReviewRule(question);
+    if (ruleChanged && payload.kind !== "reviewer_comment") {
+      this.render();
+    }
   };
 
   QuestionnaireApp.prototype.nextPage = function () {
@@ -499,7 +511,7 @@
       return "";
     }
     var isReviewer = this.role === "reviewer";
-    var answerDisabled = isReviewer ? " disabled" : "";
+    var answerDisabled = isReviewer && !question.reviewer_question ? " disabled" : "";
     var value = getQuestionBaseValue(question);
     var freeText = getQuestionFreeText(question);
     var requiredBadge = question.required ? '<span class="q-required">Required</span>' : "";
@@ -547,9 +559,10 @@
     } else {
       answerMarkup += '<p class="q-error">Unsupported question type: ' + escapeHtml(question.type) + "</p>";
     }
+    var cardClass = "q-card" + (question.reviewer_question ? " is-reviewer-question" : "");
 
     return [
-      '<section class="q-card" data-question="' + escapeHtml(question.id) + '">',
+      '<section class="' + cardClass + '" data-question="' + escapeHtml(question.id) + '">',
       '<div class="q-card-head">',
       '<h3 class="q-prompt">' + escapeHtml(question.prompt) + "</h3>",
       requiredBadge,

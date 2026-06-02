@@ -174,6 +174,7 @@ Each question must have:
 - optional visibility condition,
 - optional default value,
 - optional `allow_freetext` flag,
+- optional `reviewer_question` flag,
 - optional `multiline` flag and `textarea_rows` count for textarea rendering,
 - optional `rule_on_value` and `rule_status` fields for rule-based review status,
 - runtime state fields for answer and review information.
@@ -207,6 +208,7 @@ All question types must support the following shared parameters:
 
 - `default`
 - `allow_freetext`
+- `reviewer_question`
 - `multiline`
 - `textarea_rows`
 - `answer`
@@ -238,6 +240,14 @@ The implementation must document the exact rendering behavior for `text`. The re
 - for `radio` and `dropdown`, `allow_freetext` enables an "Other" text input,
 - for `checkbox`, `allow_freetext` enables an optional explanation field,
 - for `text` and `editable_predefined_text`, the flag is accepted for schema consistency but has no additional UI effect unless explicitly configured by the embedding application.
+
+#### `reviewer_question`
+
+The `reviewer_question` field is a boolean flag for questions answered by reviewers rather than interviewed users.
+
+When `reviewer_question` is `true`, the question is hidden in the `interviewed` role. In the `reviewer` role, the question is shown and its answer control is editable.
+
+Reviewer questions otherwise behave like regular questions, including visibility conditions, required validation when visible, answer storage, review status, and rule-based review status.
 
 #### `multiline`
 
@@ -341,11 +351,13 @@ If a status previously assigned by rule no longer matches because the answer cha
 When role is `interviewed`:
 
 - question answering controls are enabled,
+- questions with `reviewer_question: true` are hidden,
 - review controls are hidden or disabled.
 
 When role is `reviewer`:
 
 - answers are visible,
+- questions with `reviewer_question: true` are visible and answer controls are editable,
 - review controls are enabled,
 - answer controls may be read-only by default.
 - status text is visually distinguished: `pending` black, `satisfactory` green, `partial` orange, and `unsatisfactory` red.
@@ -497,6 +509,7 @@ The saved questionnaire JSON must preserve the content needed for later restorat
 - visibility rules,
 - option lists,
 - `allow_freetext` behavior,
+- `reviewer_question` behavior,
 - required flags,
 - default values,
 - current answer values,

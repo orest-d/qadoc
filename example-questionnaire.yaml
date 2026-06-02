@@ -108,6 +108,27 @@ pages:
         review_status: pending
         review_status_by_rule: false
         reviewer_comment: ""
+      - id: q_reviewer_risk
+        type: radio
+        prompt: Reviewer risk rating
+        help: This question is hidden from the interviewed role and editable for reviewers.
+        reviewer_question: true
+        required: false
+        default: ""
+        allow_freetext: false
+        rule_on_value: high
+        rule_status: unsatisfactory
+        options:
+          - value: low
+            label: Low
+          - value: medium
+            label: Medium
+          - value: high
+            label: High
+        answer: null
+        review_status: pending
+        review_status_by_rule: false
+        reviewer_comment: ""
       - id: q_notes
         type: text
         prompt: Additional notes
