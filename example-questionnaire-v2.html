@@ -50,6 +50,23 @@
       </section>
     </template>
 
+    <template id="reviewer-question-card-template">
+      <section class="q-card q-reviewer-card {{#reviewer_question}}is-reviewer-question{{/reviewer_question}}">
+        <div class="q-card-head">
+          <h3 class="q-prompt">{{prompt}}</h3>
+          <span class="q-meta-pill">{{type}}</span>
+        </div>
+        <dl class="q-reviewer-meta">
+          <div><dt>ID</dt><dd>{{id}}</dd></div>
+          <div><dt>Page</dt><dd>{{page_id}}</dd></div>
+          {{#rule_status}}<div><dt>Rule status</dt><dd>{{rule_status}}</dd></div>{{/rule_status}}
+        </dl>
+        {{#help}}<p class="q-help">{{help}}</p>{{/help}}
+        <div class="q-answer-block" data-question-control></div>
+        {{#has_status}}<div data-review-control></div>{{/has_status}}
+      </section>
+    </template>
+
     <template id="question-editor-template">
       <form class="q-editor-form" data-question-editor>
         <fieldset class="q-editor-section is-essential">
@@ -236,6 +253,7 @@
         },
         templates: {
           questionCard: document.getElementById("question-card-template"),
+          reviewerQuestionCard: document.getElementById("reviewer-question-card-template"),
           editorForm: document.getElementById("question-editor-template")
         },
         onChange: (event) => syncModeVisibleActions(event.mode)

@@ -92,10 +92,10 @@
       return fallback;
     }
     var text = String(value).trim().toLowerCase();
-    if (["1", "true", "yes", "y", "on"].indexOf(text) !== -1) {
+    if (["1", "true", "t", "yes", "y", "on"].indexOf(text) !== -1) {
       return true;
     }
-    if (["0", "false", "no", "n", "off"].indexOf(text) !== -1) {
+    if (["0", "false", "f", "no", "n", "off"].indexOf(text) !== -1) {
       return false;
     }
     return fallback;
@@ -109,13 +109,14 @@
     if (text === "") {
       return "";
     }
-    if (text === "true") {
+    var lowered = text.toLowerCase();
+    if (["1", "true", "t", "yes", "y"].indexOf(lowered) !== -1) {
       return true;
     }
-    if (text === "false") {
+    if (["0", "false", "f", "no", "n"].indexOf(lowered) !== -1) {
       return false;
     }
-    if (text === "null") {
+    if (lowered === "null") {
       return null;
     }
     return value;
@@ -203,7 +204,63 @@
     return text;
   }
 
+  function firstCsvLine(text) {
+    var inQuotes = false;
+    var line = "";
+    for (var i = 0; i < text.length; i += 1) {
+      var ch = text[i];
+      if (inQuotes) {
+        if (ch === '"' && text[i + 1] === '"') {
+          line += '""';
+          i += 1;
+        } else if (ch === '"') {
+          inQuotes = false;
+          line += ch;
+        } else {
+          line += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+        line += ch;
+      } else if (ch === "\n" || ch === "\r") {
+        break;
+      } else {
+        line += ch;
+      }
+    }
+    return line;
+  }
+
+  function detectCsvDelimiter(text) {
+    var line = firstCsvLine(text);
+    var candidates = [",", ";", "|", "\t"];
+    var counts = candidates.map(function (delimiter) {
+      var count = 0;
+      var inQuotes = false;
+      for (var i = 0; i < line.length; i += 1) {
+        var ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') {
+            i += 1;
+          } else if (ch === '"') {
+            inQuotes = false;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === delimiter) {
+          count += 1;
+        }
+      }
+      return { delimiter: delimiter, count: count };
+    });
+    counts.sort(function (a, b) {
+      return b.count - a.count;
+    });
+    return counts[0].count > 0 ? counts[0].delimiter : ",";
+  }
+
   function parseCsv(text) {
+    var delimiter = detectCsvDelimiter(text);
     var rows = [];
     var row = [];
     var cell = "";
@@ -221,7 +278,7 @@
         }
       } else if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ",") {
+      } else if (ch === delimiter) {
         row.push(cell);
         cell = "";
       } else if (ch === "\n") {
@@ -348,6 +405,7 @@
     this.validationErrors = {};
     this.currentPageId = "";
     this.editorAdvanced = {};
+    this.editorSearch = "";
     this.questions = [];
     this.pages = [];
     this.loadData({ config: this.config, pages: config.pages || [], questions: config.questions || [] }, { silent: true });
@@ -781,7 +839,8 @@
   };
 
   QuestionnaireV2App.prototype.renderQuestion = function (question) {
-    var template = getTemplateHtml(this.templates.questionCard) || '<section class="q-card {{#reviewer_question}}is-reviewer-question{{/reviewer_question}}"><div class="q-card-head"><h3 class="q-prompt">{{prompt}}</h3></div><div data-question-control></div>{{#has_status}}<div data-review-control></div>{{/has_status}}</section>';
+    var template = this.mode === "reviewer" ? getTemplateHtml(this.templates.reviewerQuestionCard) : "";
+    template = template || getTemplateHtml(this.templates.questionCard) || '<section class="q-card {{#reviewer_question}}is-reviewer-question{{/reviewer_question}}"><div class="q-card-head"><h3 class="q-prompt">{{prompt}}</h3></div><div data-question-control></div>{{#has_status}}<div data-review-control></div>{{/has_status}}</section>';
     var wrapper = document.createElement("div");
     wrapper.innerHTML = renderMustache(template, question).trim();
     var node = wrapper.firstElementChild;
@@ -912,13 +971,40 @@
       return;
     }
     var self = this;
-    container.innerHTML = '<div class="q-editor-toolbar"><button type="button" data-v2-add-question>Add question</button></div>' + this.questions.map(function (question, index) {
+    var search = this.editorSearch || "";
+    var visibleQuestions = this.questions.filter(function (question) {
+      return self.editorQuestionMatchesSearch(question, search);
+    });
+    container.innerHTML = '<div class="q-editor-toolbar"><label class="q-editor-search"><span>Search</span><input type="search" data-v2-editor-search value="' + escapeHtml(search) + '" placeholder="Prompt, ID, or answer"></label><button type="button" data-v2-add-question>Add question</button></div>' + visibleQuestions.map(function (question) {
+      var index = self.questions.indexOf(question);
       return self.renderEditorQuestion(question, index);
     }).join("");
+    var searchInput = container.querySelector("[data-v2-editor-search]");
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        self.editorSearch = searchInput.value;
+        self.renderEditor();
+        var nextInput = self.containers.editor && self.containers.editor.querySelector("[data-v2-editor-search]");
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+        }
+      });
+    }
     container.querySelector("[data-v2-add-question]").addEventListener("click", function () {
       self.addQuestion({ page_id: self.currentPageId || "default", order: self.questions.length + 1, type: "text", prompt: "New question" });
     });
     this.bindEditorControls(container);
+  };
+
+  QuestionnaireV2App.prototype.editorQuestionMatchesSearch = function (question, search) {
+    var needle = String(search || "").trim().toLowerCase();
+    if (!needle) {
+      return true;
+    }
+    return [question.id, question.prompt, question.answer].some(function (value) {
+      return displayValue(value).toLowerCase().indexOf(needle) !== -1;
+    });
   };
 
   QuestionnaireV2App.prototype.renderEditorQuestion = function (question, index) {

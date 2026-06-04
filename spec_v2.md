@@ -586,6 +586,8 @@ The template context should include:
 
 Changing the question card template should be enough to display extra fields without changing core renderer code.
 
+Implementations should support a separate reviewer-mode question template, such as `reviewerQuestionCard`. When present, this template is used in reviewer mode and may display question fields or extra fields that are not shown to the interviewed user. If no reviewer template is provided, the renderer should fall back to the normal `questionCard` template.
+
 ### 11.3 Editor Templates
 
 Editor forms should also be template-driven or configurable.
@@ -652,9 +654,11 @@ The browser app must support import/export without Python tools.
 CSV import must:
 
 - parse a header row,
+- detect the delimiter from the header row; supported delimiters are comma, semicolon, pipe (`|`), and tab,
 - map columns to question fields,
 - preserve unknown columns as extra fields,
-- parse booleans and numbers where known fields require them,
+- parse booleans case-insensitively where known fields require them; accepted true values include `true`, `t`, `yes`, `y`, and `1`, and accepted false values include `false`, `f`, `no`, `n`, and `0`,
+- parse numbers where known fields require them,
 - parse JSON-string fields such as `options` and `visible_if` where appropriate,
 - report row-level errors clearly.
 
@@ -727,6 +731,7 @@ const app = QuestionnaireV2.create({
   },
   templates: {
     questionCard: document.getElementById("question-card-template"),
+    reviewerQuestionCard: document.getElementById("reviewer-question-card-template"),
     editorForm: document.getElementById("question-editor-template")
   },
   onChange(event, api) {
@@ -848,7 +853,10 @@ Editor mode must support:
 - editing rule fields,
 - editing `reviewer_question`,
 - editing `has_status`,
+- searching questions by `id`, `prompt`, or `answer`,
 - preserving extra fields.
+
+When the editor search field is not empty, editor mode should show only questions whose `id`, `prompt`, or `answer` contains the search text. Matching should be case-insensitive and should not change question order or persisted data.
 
 The editor should use forms rather than raw JSON as the primary UI.
 
@@ -944,7 +952,8 @@ The repository should include an example HTML template that declares the default
       editor: document.getElementById("editor")
     },
     templates: {
-      questionCard: document.getElementById("question-card-template")
+      questionCard: document.getElementById("question-card-template"),
+      reviewerQuestionCard: document.getElementById("reviewer-question-card-template")
     }
   });
 
