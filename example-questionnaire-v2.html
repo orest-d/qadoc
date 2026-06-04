@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Questionnaire V2 Example Template</title>
+    <link rel="stylesheet" href="questionnaire.css">
+  </head>
+  <body>
+    <div class="q-shell">
+      <header class="q-header">
+        <div>
+          <p class="q-kicker">Questionnaire</p>
+          <h1 id="questionnaire-title">Project Onboarding Questionnaire</h1>
+          <p id="questionnaire-version" class="q-subtitle">Version 2.0</p>
+        </div>
+        <div class="q-toolbar">
+          <label>
+            <span>Mode</span>
+            <select id="mode-select"></select>
+          </label>
+          <div class="q-toolbar-actions">
+            <button type="button" id="load-csv" data-visible-modes="reviewer editor">Load CSV</button>
+            <button type="button" id="save-csv" data-visible-modes="reviewer editor">Save CSV</button>
+            <button type="button" id="load-json" data-visible-modes="reviewer editor">Load JSON</button>
+            <button type="button" id="save-json" data-visible-modes="reviewer editor">Save JSON</button>
+            <button type="button" id="save-html">Save HTML</button>
+          </div>
+        </div>
+      </header>
+
+      <nav id="page-nav" class="q-page-nav"></nav>
+      <main id="questions" class="q-questions"></main>
+      <footer class="q-footer">
+        <button type="button" id="prev-page">Previous</button>
+        <button type="button" id="next-page">Next</button>
+      </footer>
+      <section id="editor"></section>
+    </div>
+
+    <template id="question-card-template">
+      <section class="q-card {{#reviewer_question}}is-reviewer-question{{/reviewer_question}}">
+        <div class="q-card-head">
+          <h3 class="q-prompt">{{prompt}}</h3>
+          {{#required}}<span class="q-required">Required</span>{{/required}}
+        </div>
+        {{#help}}<p class="q-help">{{help}}</p>{{/help}}
+        <div class="q-answer-block" data-question-control></div>
+        {{#has_status}}<div data-review-control></div>{{/has_status}}
+      </section>
+    </template>
+
+    <template id="question-editor-template">
+      <form class="q-editor-form" data-question-editor>
+        <fieldset class="q-editor-section is-essential">
+          <legend>Identity and placement</legend>
+          <div data-editor-field="id"></div>
+          <div data-editor-field="page_id"></div>
+          <div data-editor-field="order"></div>
+          <div data-editor-field="type"></div>
+        </fieldset>
+
+        <fieldset class="q-editor-section is-essential">
+          <legend>Content</legend>
+          <div data-editor-field="prompt"></div>
+          <div data-editor-field="help"></div>
+        </fieldset>
+
+        <fieldset class="q-editor-section is-essential">
+          <legend>Behavior</legend>
+          <div data-editor-field="required"></div>
+          <div data-editor-field="default"></div>
+          <div data-editor-field="allow_freetext"></div>
+          <div data-editor-field="reviewer_question"></div>
+          <div data-editor-field="has_status"></div>
+          <div data-editor-field="multiline"></div>
+        </fieldset>
+
+        <fieldset class="q-editor-section is-advanced">
+          <legend>Advanced behavior</legend>
+          <div data-editor-field="textarea_rows"></div>
+          <div data-editor-field="options"></div>
+        </fieldset>
+
+        <fieldset class="q-editor-section is-advanced">
+          <legend>Visibility and rules</legend>
+          <div data-editor-field="visible_if_question_id"></div>
+          <div data-editor-field="visible_if_operator"></div>
+          <div data-editor-field="visible_if_value"></div>
+          <div data-editor-field="visible_if"></div>
+          <div data-editor-field="rule_on_value"></div>
+          <div data-editor-field="rule_status"></div>
+        </fieldset>
+
+        <fieldset class="q-editor-section is-advanced">
+          <legend>State</legend>
+          <div data-editor-field="answer"></div>
+          <div data-editor-field="review_status"></div>
+          <div data-editor-field="review_status_by_rule"></div>
+          <div data-editor-field="reviewer_comment"></div>
+        </fieldset>
+      </form>
+    </template>
+
+    <script src="questionnaire_v2.js"></script>
+    <script id="questionnaire-v2-data" type="application/json"></script>
+    <script>
+      const embeddedDataElement = document.getElementById("questionnaire-v2-data");
+      const embeddedData = embeddedDataElement && embeddedDataElement.textContent.trim()
+        ? JSON.parse(embeddedDataElement.textContent)
+        : null;
+
+      const questionnaireConfig = embeddedData?.config || {
+        id: "onboarding-review",
+        title: "Project Onboarding Questionnaire",
+        version: "2.0"
+      };
+
+      const pages = embeddedData?.pages || [
+        { id: "default", title: "Default", description: "", order: 0 },
+        { id: "basics", title: "General Information", description: "Baseline details.", order: 10 },
+        { id: "details", title: "Supporting Details", description: "Follow-up questions.", order: 20 }
+      ];
+
+      const modeLabels = {
+        interviewed: "Interviewed",
+        reviewer: "Validator",
+        editor: "Editor"
+      };
+
+      function syncModeVisibleActions(mode) {
+        document.querySelectorAll("[data-visible-modes]").forEach((element) => {
+          const modes = element.dataset.visibleModes.split(/\s+/).filter(Boolean);
+          element.hidden = !modes.includes(mode);
+        });
+      }
+
+      const questionFields = [
+        { name: "id", label: "Question ID", ui: "text", required: true, section: "identity" },
+        { name: "page_id", label: "Page", ui: "page_select", default: "default", section: "identity" },
+        { name: "order", label: "Order", ui: "number", section: "identity" },
+        { name: "type", label: "Type", ui: "select", section: "identity", options: ["checkbox", "radio", "dropdown", "text", "info", "html"] },
+        { name: "prompt", label: "Prompt", ui: "textarea", section: "content" },
+        { name: "help", label: "Help", ui: "textarea", section: "content" },
+        { name: "required", label: "Required", ui: "checkbox", default: false, section: "behavior" },
+        { name: "default", label: "Default value", ui: "text", section: "behavior" },
+        { name: "allow_freetext", label: "Allow free text", ui: "checkbox", default: false, section: "behavior" },
+        { name: "reviewer_question", label: "Reviewer question", ui: "checkbox", default: false, section: "behavior" },
+        { name: "has_status", label: "Has review status", ui: "checkbox", default: true, section: "behavior" },
+        { name: "multiline", label: "Multiline", ui: "checkbox", default: false, section: "behavior" },
+        { name: "textarea_rows", label: "Textarea rows", ui: "number", default: 4, min: 1, section: "behavior" },
+        { name: "options", label: "Options", ui: "options_table", section: "behavior" },
+        { name: "visible_if_question_id", label: "Visible if question", ui: "question_select", section: "rules" },
+        { name: "visible_if_operator", label: "Visible if operator", ui: "select", section: "rules", options: ["", "equals", "not_equals", "contains"] },
+        { name: "visible_if_value", label: "Visible if value", ui: "text", section: "rules" },
+        { name: "visible_if", label: "Complex visibility JSON", ui: "json_textarea", section: "rules" },
+        { name: "rule_on_value", label: "Rule on value", ui: "text", section: "rules" },
+        { name: "rule_status", label: "Rule status", ui: "select", section: "rules", options: ["", "pending", "satisfactory", "partial", "unsatisfactory"] },
+        { name: "answer", label: "Answer", ui: "textarea", section: "state" },
+        { name: "review_status", label: "Review status", ui: "select", section: "state", options: ["pending", "satisfactory", "partial", "unsatisfactory"] },
+        { name: "review_status_by_rule", label: "Review status by rule", ui: "readonly_checkbox", section: "state" },
+        { name: "reviewer_comment", label: "Reviewer comment", ui: "textarea", section: "state" }
+      ];
+
+      const questions = embeddedData?.questions || [
+        {
+          id: "q_confirm_identity",
+          page_id: "basics",
+          order: 1,
+          type: "checkbox",
+          prompt: "I confirm that my legal name is correct in the internal records.",
+          checkbox_label: "Confirmed",
+          help: "Uncheck this box if the record must be corrected.",
+          required: true,
+          default: true,
+          allow_freetext: true,
+          rule_on_value: false,
+          rule_status: "unsatisfactory"
+        },
+        {
+          id: "q_country",
+          page_id: "basics",
+          order: 2,
+          type: "dropdown",
+          prompt: "Select your primary country of residence.",
+          required: true,
+          allow_freetext: true,
+          multiline: true,
+          textarea_rows: 4,
+          options: [
+            { value: "no", label: "Norway" },
+            { value: "se", label: "Sweden" },
+            { value: "other", label: "Other", is_other: true }
+          ],
+          rule_on_value: "other",
+          rule_status: "partial"
+        },
+        {
+          id: "q_reviewer_risk",
+          page_id: "details",
+          order: 1,
+          type: "radio",
+          prompt: "Reviewer risk rating",
+          help: "Hidden from interviewed mode and editable in reviewer mode.",
+          reviewer_question: true,
+          options: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" }
+          ],
+          rule_on_value: "high",
+          rule_status: "unsatisfactory"
+        },
+        {
+          id: "q_guidance",
+          page_id: "details",
+          order: 2,
+          type: "info",
+          prompt: "Guidance",
+          has_status: false,
+          answer: "Reviewer-only and derived values can be shown with info or html questions."
+        }
+      ];
+
+      const app = QuestionnaireV2.create({
+        config: questionnaireConfig,
+        pages,
+        questions,
+        mode: "interviewed",
+        modeLabels,
+        questionFields,
+        containers: {
+          questions: document.getElementById("questions"),
+          pageNav: document.getElementById("page-nav"),
+          editor: document.getElementById("editor")
+        },
+        templates: {
+          questionCard: document.getElementById("question-card-template"),
+          editorForm: document.getElementById("question-editor-template")
+        },
+        onChange: (event) => syncModeVisibleActions(event.mode)
+      });
+      window.questionnaireV2App = app;
+      syncModeVisibleActions(app.getMode());
+
+      document.getElementById("mode-select").addEventListener("change", (event) => app.setMode(event.target.value));
+      document.getElementById("prev-page").addEventListener("click", () => app.previousPage());
+      document.getElementById("next-page").addEventListener("click", () => app.nextPage());
+      document.getElementById("save-csv").addEventListener("click", () => app.saveCsvFile("questions.csv"));
+      document.getElementById("save-json").addEventListener("click", () => app.saveJsonFile("questionnaire.json"));
+      document.getElementById("save-html").addEventListener("click", () => app.saveHtmlFile("questionnaire.html"));
+      document.getElementById("load-csv").addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".csv,text/csv";
+        input.addEventListener("change", () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          file.text().then((text) => app.loadCsv(text));
+        });
+        input.click();
+      });
+      document.getElementById("load-json").addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.addEventListener("change", () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          file.text().then((text) => app.loadJson(text));
+        });
+        input.click();
+      });
+    </script>
+  </body>
+</html>

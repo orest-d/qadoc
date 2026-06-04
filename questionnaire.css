@@ -336,6 +336,171 @@ textarea {
   padding: 12px 18px;
 }
 
+.q-info,
+.q-html {
+  margin: 0;
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: var(--q-bg);
+  padding: 12px;
+}
+
+.q-info {
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.q-editor-toolbar {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.q-editor-toolbar button,
+.q-editor-actions button {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+.q-editor-card {
+  margin-top: 18px;
+}
+
+.q-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.q-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.q-editor-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.92rem;
+}
+
+.q-editor-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.q-editor-field input,
+.q-editor-field select,
+.q-editor-field textarea {
+  width: 100%;
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: var(--q-bg);
+  color: var(--q-ink);
+  padding: 10px 12px;
+}
+
+.q-editor-field textarea {
+  min-height: 0;
+}
+
+.q-editor-field-textarea.is-wide textarea {
+  min-height: 4.8em;
+}
+
+.q-editor-field-json_textarea.is-wide textarea {
+  min-height: 150px;
+}
+
+.q-editor-advanced-toggle {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+}
+
+.q-editor-advanced-grid {
+  margin-top: 12px;
+}
+
+.q-options-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.q-options-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.q-options-editor th,
+.q-options-editor td {
+  border-bottom: 1px solid var(--q-border);
+  padding: 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.q-options-editor tr:last-child td {
+  border-bottom: 0;
+}
+
+.q-options-editor input[type="text"] {
+  min-width: 110px;
+}
+
+.q-option-other {
+  text-align: center;
+}
+
+.q-option-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.q-options-editor button,
+.q-option-actions button {
+  border: 1px solid var(--q-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 7px 10px;
+}
+
+.q-editor-form fieldset {
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+  margin: 0 0 14px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.q-editor-form legend {
+  padding: 0 6px;
+  font-weight: 650;
+}
+
+.q-editor-section[hidden] {
+  display: none;
+}
+
+.q-editor-slot.is-wide {
+  grid-column: 1 / -1;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -368,5 +533,13 @@ textarea:focus-visible {
 
   .q-footer {
     flex-direction: column;
+  }
+
+  .q-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .q-editor-form fieldset {
+    grid-template-columns: 1fr;
   }
 }
