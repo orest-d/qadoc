@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Questionnaire V3 Example Template</title>
+    <link rel="stylesheet" href="questionnaire.css">
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5/lib/codemirror.css">
+  </head>
+  <body>
+    <div class="q-shell">
+      <header class="q-header">
+        <div>
+          <p class="q-kicker">Questionnaire</p>
+          <h1 id="questionnaire-title">Project Onboarding Questionnaire</h1>
+          <p id="questionnaire-version" class="q-subtitle">Version 3.0</p>
+        </div>
+        <div class="q-toolbar">
+          <label>
+            <span>Role</span>
+            <select id="role-select"></select>
+          </label>
+          <label data-roles="reviewer editor">
+            <span>View</span>
+            <select id="view-select"></select>
+          </label>
+          <div class="q-toolbar-actions">
+            <label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV
+              <input type="file" id="load-csv" accept=".csv,text/csv">
+            </label>
+            <button type="button" class="q-toolbar-action" id="save-csv" data-roles="reviewer editor">💾 Save CSV</button>
+            <button type="button" class="q-toolbar-action" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>
+            <button type="button" class="q-toolbar-action" id="save-html">💾 Save HTML</button>
+          </div>
+        </div>
+      </header>
+
+      <nav id="category-nav"></nav>
+      <div id="summary"></div>
+      <main id="questions" class="q-questions"></main>
+      <footer class="q-footer">
+        <button type="button" id="prev-category">Previous</button>
+        <button type="button" id="next-category">Next</button>
+      </footer>
+      <section id="editor"></section>
+    </div>
+
+    <template id="question-card-template">
+      <section class="q-card" data-question-id="{{id}}">
+        <div class="q-card-head">
+          <h3 class="q-prompt">{{question}}</h3>
+          {{#required}}<span class="q-required">*</span>{{/required}}
+          {{#subcategory}}<span class="q-subcategory">{{subcategory}}</span>{{/subcategory}}
+          {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}
+        </div>
+        {{#help}}<p class="q-help">{{help}}</p>{{/help}}
+        {{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}
+        <div class="q-answer-block" data-question-control></div>
+        {{#_comment_readonly}}<div class="q-reviewer-comment">{{reviewer_comment}}</div>{{/_comment_readonly}}
+        <div data-review-control></div>
+        <div data-reviewer-comment-control></div>
+        {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}
+      </section>
+    </template>
+
+    <template id="reviewer-question-card-template">
+      <section class="q-card q-reviewer-card" data-question-id="{{id}}">
+        <div class="q-card-head">
+          <h3 class="q-prompt">{{question}}</h3>
+          <span class="q-meta-pill q-status-{{review_status}}">{{_status_label}}</span>
+          {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}
+        </div>
+        {{#analysis}}<p class="q-analysis">{{analysis}}</p>{{/analysis}}
+        {{#help}}<p class="q-help">{{help}}</p>{{/help}}
+        <div class="q-answer-block" data-question-control></div>
+        <div data-review-control></div>
+        <div data-reviewer-comment-control></div>
+        {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}
+      </section>
+    </template>
+
+    <template id="question-editor-template">
+      <form class="q-editor-form" data-question-editor>
+        <fieldset class="q-editor-section">
+          <legend>Identity</legend>
+          <div data-editor-field="id"></div>
+          <div data-editor-field="category"></div>
+          <div data-editor-field="subcategory"></div>
+          <div data-editor-field="type"></div>
+        </fieldset>
+        <fieldset class="q-editor-section">
+          <legend>Content</legend>
+          <div data-editor-field="question"></div>
+          <div data-editor-field="help"></div>
+        </fieldset>
+        <fieldset class="q-editor-section">
+          <legend>Behavior</legend>
+          <div data-editor-field="required"></div>
+          <div data-editor-field="default"></div>
+          <div data-editor-field="rows"></div>
+          <div data-editor-field="options"></div>
+        </fieldset>
+        <fieldset class="q-editor-section">
+          <legend>Visibility</legend>
+          <div data-editor-field="visible_if_id"></div>
+          <div data-editor-field="visible_if_value"></div>
+        </fieldset>
+        <fieldset class="q-editor-section">
+          <legend>Review</legend>
+          <div data-editor-field="weight"></div>
+          <div data-editor-field="analysis"></div>
+        </fieldset>
+        <fieldset class="q-editor-section">
+          <legend>State</legend>
+          <div data-editor-field="answer"></div>
+          <div data-editor-field="review_status"></div>
+          <div data-editor-field="reviewer_comment"></div>
+        </fieldset>
+      </form>
+    </template>
+
+    <script src="https://unpkg.com/mustache@latest/mustache.min.js"></script>
+    <script src="https://unpkg.com/codemirror@5/lib/codemirror.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/xml/xml.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/javascript/javascript.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/css/css.js"></script>
+    <script src="questionnaire_v3.js"></script>
+
+    <script id="questionnaire-v3-data" type="application/json"></script>
+    <script id="questionnaire-v3-templates" type="application/json"></script>
+
+    <script>
+      const dataElement = document.getElementById("questionnaire-v3-data");
+      const embeddedData = dataElement && dataElement.textContent.trim()
+        ? JSON.parse(dataElement.textContent)
+        : null;
+
+      const templatesElement = document.getElementById("questionnaire-v3-templates");
+      const embeddedTemplates = templatesElement && templatesElement.textContent.trim()
+        ? JSON.parse(templatesElement.textContent)
+        : {};
+
+      const questionnaireConfig = embeddedData?.config || {
+        id: "onboarding-review",
+        title: "Project Onboarding Questionnaire",
+        version: "3.0"
+      };
+
+      const questions = embeddedData?.questions || [
+        {
+          id: "q_full_name",
+          category: "basics",
+          question: "What is your full legal name?",
+          type: "text",
+          required: true
+        },
+        {
+          id: "q_employment",
+          category: "basics",
+          question: "What is your employment status?",
+          type: "dropdown",
+          options: [
+            { value: "employed", label: "Employed" },
+            { value: "self_employed", label: "Self-employed" },
+            { value: "other", label: "Other", is_other: true }
+          ]
+        },
+        {
+          id: "q_employment_other",
+          category: "basics",
+          question: "Please describe your employment status.",
+          type: "text",
+          visible_if_id: "q_employment",
+          visible_if_value: "other"
+        },
+        {
+          id: "q_has_conflicts",
+          category: "governance",
+          question: "Does the project have any conflicts of interest?",
+          type: "yes_or_no",
+          help: "Answer truthfully — this drives the reviewer assessment below."
+        },
+        {
+          id: "q_conflict_details",
+          category: "governance",
+          question: "Are there mitigations already in place?",
+          type: "no_or_text",
+          help: "Choose No, or describe the mitigations."
+        },
+        {
+          id: "q_review_conflicts",
+          category: "governance",
+          question: "Conflicts of interest assessment",
+          type: "review",
+          weight: 2,
+          analysis: "Automatically derived from the conflict-of-interest answer."
+        },
+        {
+          id: "q_review_docs",
+          category: "governance",
+          question: "Documentation completeness",
+          type: "review",
+          weight: 1
+        }
+      ];
+
+      const app = QuestionnaireV3.create({
+        config: questionnaireConfig,
+        questions,
+        role: "interviewed",
+        roleLabels: { interviewed: "Applicant", reviewer: "Validator", editor: "Designer" },
+        statusLabels: { pending: "?", satisfactory: "OK", partial: "WARN", unsatisfactory: "ERR" },
+        ragThresholds: { green: 80, amber: 50 },
+        containers: {
+          questions: document.getElementById("questions"),
+          categoryNav: document.getElementById("category-nav"),
+          editor: document.getElementById("editor"),
+          summary: document.getElementById("summary")
+        },
+        templates: {
+          questionCard: document.getElementById("question-card-template"),
+          reviewerQuestionCard: document.getElementById("reviewer-question-card-template"),
+          editorForm: document.getElementById("question-editor-template")
+        },
+        templateOverrides: embeddedTemplates,
+        onChange(event, api) {
+          // Rule: set the conflict-of-interest review status from the answer.
+          if (event.question_id === "q_has_conflicts" && event.type === "answer") {
+            const value = api.getAnswer("q_has_conflicts");
+            if (value === true) {
+              api.setReviewStatus("q_review_conflicts", "unsatisfactory", { silent: true });
+            } else if (value === false) {
+              api.setReviewStatus("q_review_conflicts", "satisfactory", { silent: true });
+            } else {
+              api.setReviewStatus("q_review_conflicts", "pending", { silent: true });
+            }
+          }
+        }
+      });
+      window.questionnaireV3App = app;
+
+      // Show only the role-appropriate toolbar actions, and let the editor use
+      // the full screen width.
+      function syncRoleControls(role) {
+        document.querySelectorAll("[data-roles]").forEach((element) => {
+          const roles = element.getAttribute("data-roles").split(/\s+/).filter(Boolean);
+          element.hidden = roles.indexOf(role) === -1;
+        });
+        document.getElementById("save-html").textContent = role === "interviewed" ? "💾 Save" : "💾 Save HTML";
+        document.querySelector(".q-shell").classList.toggle("is-fullwidth", role === "editor");
+      }
+      syncRoleControls(app.getRole());
+
+      document.getElementById("role-select").addEventListener("change", (e) => {
+        app.setRole(e.target.value);
+        syncRoleControls(app.getRole());
+      });
+      document.getElementById("view-select").addEventListener("change", (e) => app.setView(e.target.value));
+      document.getElementById("prev-category").addEventListener("click", () => app.previousCategory());
+      document.getElementById("next-category").addEventListener("click", () => app.nextCategory());
+      document.getElementById("save-csv").addEventListener("click", () => app.saveCsvFile("questions.csv"));
+      document.getElementById("save-json").addEventListener("click", () => app.saveJsonFile("questionnaire.json"));
+      document.getElementById("save-html").addEventListener("click", () => app.saveHtmlFile("questionnaire.html"));
+      document.getElementById("load-csv").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        file.text().then((text) => app.loadCsv(text));
+      });
+    </script>
+  </body>
+</html>

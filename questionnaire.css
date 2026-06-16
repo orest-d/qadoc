@@ -604,3 +604,410 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===========================================================================
+   Questionnaire V3 additions
+   =========================================================================== */
+
+:root {
+  --q-reviewer-comment-color: #1d4ed8;
+  --q-reviewer-comment-bg: #eff4ff;
+  --q-rag-green: #23784a;
+  --q-rag-amber: #7a6200;
+  --q-rag-red: #b33a30;
+  --q-rag-neutral: #6b7280;
+  --q-tabular-group-question-bg: #eaf2fb;
+  --q-tabular-group-ui-bg: #fdf6e3;
+  --q-tabular-group-optional-bg: #ecf7ee;
+}
+
+/* The hidden attribute must win over component display rules
+   (e.g. .q-toolbar-action sets display:inline-flex). */
+[hidden] {
+  display: none !important;
+}
+
+/* --- category navigation (reuses page-tab styling) --- */
+.q-category-tab {
+  border-radius: 10px;
+  border: 1px solid var(--q-border);
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+.q-category-tab.is-current {
+  background: var(--q-accent-soft);
+}
+
+#category-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0 0;
+}
+
+/* --- question card extras --- */
+.q-subcategory {
+  white-space: nowrap;
+  border: 1px solid var(--q-border);
+  border-radius: 999px;
+  background: var(--q-bg);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: rgba(29, 36, 64, 0.7);
+}
+
+.q-analysis {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--q-border);
+  background: var(--q-bg);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.92rem;
+}
+
+/* Review-type question cards are highlighted for reviewers/editors. */
+.q-reviewer-card {
+  background: var(--q-accent-soft);
+  border-color: rgba(0, 0, 94, 0.18);
+}
+
+.q-reviewer-comment {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--q-reviewer-comment-color);
+  background: var(--q-reviewer-comment-bg);
+  color: var(--q-reviewer-comment-color);
+}
+
+.q-edit-btn {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.q-empty {
+  color: rgba(29, 36, 64, 0.6);
+  padding: 20px;
+}
+
+.q-highlight {
+  outline: 3px solid var(--q-accent-soft);
+  outline-offset: 3px;
+  transition: outline-color 0.4s ease;
+}
+
+/* --- yes/no controls --- */
+.q-yesno {
+  flex-direction: row;
+  gap: 18px;
+}
+
+.q-yesno-text {
+  margin-top: 10px;
+}
+
+/* --- review controls --- */
+.q-review-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--q-border);
+  background: #f8fafc;
+  display: grid;
+  gap: 12px;
+}
+
+.q-comment-field {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.q-comment-field textarea,
+.q-review-field select,
+.q-review-field textarea {
+  width: 100%;
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: var(--q-bg);
+  color: var(--q-ink);
+  padding: 10px 12px;
+}
+
+/* --- status colors (pills & summary counts) --- */
+.q-status-pending { color: var(--q-status-pending); }
+.q-status-satisfactory { color: var(--q-status-satisfactory); }
+.q-status-partial { color: var(--q-status-partial); }
+.q-status-unsatisfactory { color: var(--q-status-unsatisfactory); }
+
+select.q-review-status { font-weight: 650; }
+select.q-review-status option { color: var(--q-ink); }
+
+/* --- reviewer summary panel --- */
+.q-summary-panel {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--q-border);
+  background: #ffffff;
+  box-shadow: var(--q-shadow);
+}
+
+.q-summary-block {
+  flex: 1 1 240px;
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--q-bg);
+}
+
+.q-summary-label {
+  font-weight: 700;
+  text-transform: capitalize;
+  margin-bottom: 6px;
+}
+
+.q-summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.q-summary-score {
+  margin-top: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.q-summary-block.q-rag-green { border-left: 6px solid var(--q-rag-green); }
+.q-summary-block.q-rag-amber { border-left: 6px solid var(--q-rag-amber); }
+.q-summary-block.q-rag-red { border-left: 6px solid var(--q-rag-red); }
+.q-summary-block.q-rag-neutral { border-left: 6px solid var(--q-rag-neutral); }
+
+.q-summary-block.q-rag-green .q-summary-score { color: var(--q-rag-green); }
+.q-summary-block.q-rag-amber .q-summary-score { color: var(--q-rag-amber); }
+.q-summary-block.q-rag-red .q-summary-score { color: var(--q-rag-red); }
+
+/* Editor uses the full viewport width to show as much of the table/form as
+   possible. Add the `is-fullwidth` class to the shell while in the editor role. */
+.q-shell.is-fullwidth {
+  max-width: none;
+}
+
+/* --- tabular view --- */
+.q-tabular {
+  margin-top: 18px;
+}
+
+.q-tabular-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.q-tabular-add {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+.q-tabular-scroll {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+}
+
+.q-tabular-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.78rem;
+}
+
+.q-tabular-table th,
+.q-tabular-table td {
+  border: 1px solid var(--q-border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.q-tabular-table thead th {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 2;
+}
+
+.q-tabular-groups th {
+  text-align: center;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.q-tabular-group-question { background: var(--q-tabular-group-question-bg); }
+.q-tabular-group-ui { background: var(--q-tabular-group-ui-bg); }
+.q-tabular-group-optional { background: var(--q-tabular-group-optional-bg); }
+
+.q-tabular-table input,
+.q-tabular-table select,
+.q-tabular-table textarea {
+  width: 100%;
+  min-width: 90px;
+  border: 1px solid var(--q-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--q-ink);
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}
+
+.q-tabular-table textarea {
+  min-height: 0;
+  resize: vertical;
+}
+
+.q-tabular-controls {
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 1;
+}
+
+.q-tabular-controls-head {
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 3;
+}
+
+.q-tabular-controls button {
+  border: 1px solid var(--q-border);
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  padding: 3px 6px;
+  margin: 1px;
+}
+
+.q-tabular-readonly {
+  color: rgba(29, 36, 64, 0.7);
+}
+
+.q-tabular-preview {
+  font-style: italic;
+  color: rgba(29, 36, 64, 0.6);
+}
+
+/* --- editor panel (slide-in drawer, always visible while open) --- */
+.q-editor-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(540px, 100%);
+  height: 100vh;
+  overflow: auto;
+  z-index: 50;
+  border-left: 1px solid var(--q-border);
+  background: #ffffff;
+  box-shadow: -12px 0 30px rgba(0, 0, 40, 0.18);
+  padding: 18px 20px;
+}
+
+.q-editor-panel-head {
+  position: sticky;
+  top: -18px;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--q-border);
+}
+
+.q-editor-panel-head h3 {
+  margin: 0;
+}
+
+.q-editor-close {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+/* --- template editor --- */
+.q-template-editor {
+  margin-top: 18px;
+}
+
+.q-template-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.q-template-tab {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 8px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.q-template-tab.is-current {
+  background: var(--q-accent-soft);
+}
+
+.q-template-code {
+  width: 100%;
+  min-height: 420px;
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--q-ink);
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.q-template-editor .CodeMirror {
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+  height: auto;
+  min-height: 420px;
+}
