@@ -2,9 +2,9 @@
 """Build a single self-contained v3 questionnaire HTML file.
 
 Inlines the CSS, Mustache.js and the questionnaire_v3.js library directly into
-the page so the result works offline with no external requests. CodeMirror is
-NOT embedded; the template editor falls back to a plain textarea without it, so
-any CodeMirror <link>/<script> references are stripped out.
+the page so the result works offline with no external requests. CodeMirror CDN
+links are kept as-is: syntax highlighting works when online and the template
+editor falls back to a plain textarea when offline.
 
 Examples:
     # Build an empty, self-contained questionnaire from the template
@@ -125,7 +125,6 @@ def build(
     html = inline_css(html, read_text(css_path))
     html = inline_script(html, r"[^\"]*mustache[^\"]*", read_text(mustache_path), "Mustache.js")
     html = inline_script(html, r"(?:[^\"]*/)?questionnaire_v3\.js", read_text(library_path), "questionnaire_v3.js")
-    html = strip_codemirror(html)
     if data_path is not None:
         html = embed_data(html, load_data(data_path))
     output_path.write_text(html, encoding="utf-8")

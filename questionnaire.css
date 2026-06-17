@@ -834,8 +834,6 @@ select.q-review-status option { color: var(--q-ink); }
 }
 
 .q-tabular-scroll {
-  overflow: auto;
-  max-height: 70vh;
   border: 1px solid var(--q-border);
   border-radius: 12px;
 }
@@ -1010,4 +1008,219 @@ select.q-review-status option { color: var(--q-ink); }
   border-radius: 12px;
   height: auto;
   min-height: 420px;
+}
+
+/* §9 — compact reviewer card head */
+.q-reviewer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.q-reviewer-head .q-meta-pill {
+  margin-left: auto;
+}
+
+/* §6 — comment balloon (Word-style right-margin annotation) */
+.q-card {
+  position: relative;
+}
+
+.q-comment-balloon {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 0;
+  width: max(220px, calc((100vw - 1040px) / 2 - 16px));
+  background: #fff9e6;
+  border: 1.5px solid #f0b429;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.83rem;
+  line-height: 1.4;
+  color: #5a4a00;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  z-index: 5;
+}
+
+.q-comment-balloon::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 10px;
+  border: 5px solid transparent;
+  border-right-color: #f0b429;
+}
+
+.q-comment-balloon-edit {
+  background: #eaf4ff;
+  border-color: #5b8dee;
+  color: inherit;
+}
+
+.q-comment-balloon-edit::before {
+  border-right-color: #5b8dee;
+}
+
+.q-comment-balloon-edit label {
+  display: block;
+}
+
+.q-comment-balloon-edit textarea {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  border: 1px solid var(--q-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.83rem;
+}
+
+@media (max-width: 900px) {
+  .q-comment-balloon {
+    position: static;
+    width: auto;
+    right: auto;
+    margin-top: 10px;
+  }
+
+  .q-comment-balloon::before {
+    display: none;
+  }
+}
+
+/* §13 — display view */
+.q-display {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  line-height: 1.7;
+}
+
+.q-display-category {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 32px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--q-border);
+  color: var(--q-ink);
+}
+
+.q-display-item,
+.q-display-reviewer-item {
+  margin: 12px 0;
+  padding: 0;
+}
+
+.q-display-question {
+  font-weight: 500;
+  margin: 0 0 2px;
+}
+
+.q-display-reviewer-question {
+  font-style: italic;
+  color: rgba(29,36,64,0.7);
+}
+
+.q-display-answer {
+  margin: 0;
+  color: var(--q-ink);
+}
+
+.q-display-comment {
+  margin: 2px 0 0;
+  font-size: 0.88rem;
+  color: var(--q-reviewer-comment-color);
+}
+
+.q-display-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* §16 — drag-and-drop classes */
+.q-drag-source {
+  opacity: 0.4;
+}
+
+.q-drag-over {
+  outline: 2px solid var(--q-accent-soft);
+}
+
+.q-drag-handle {
+  display: inline-block;
+  padding: 3px 5px;
+  margin: 1px;
+  cursor: grab;
+  color: rgba(29, 36, 64, 0.4);
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+  border-radius: 4px;
+}
+
+.q-drag-handle:hover {
+  color: var(--q-ink);
+  background: var(--q-accent-soft);
+}
+
+.q-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* §1 — tabular normal-view link */
+.q-tabular-normalview {
+  display: inline-block;
+  padding: 3px 5px;
+  margin: 1px;
+  text-decoration: none;
+  color: var(--q-ink);
+  border: 1px solid var(--q-border);
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 0.9rem;
+}
+
+.q-tabular-normalview:hover {
+  background: var(--q-accent-soft);
+}
+
+/* §17 — sort-by-category button */
+.q-tabular-sort {
+  border: 1px solid var(--q-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-left: 8px;
+}
+
+/* §4 — date today button */
+.q-date-today {
+  border: 1px solid var(--q-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--q-ink);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  margin-left: 6px;
+}
+
+/* §2 — is_other companion */
+.q-other-text {
+  display: block;
+  margin-top: 8px;
+}
+
+/* §5 — visibility checkboxes in toolbar */
+.q-toolbar-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  align-self: center;
 }

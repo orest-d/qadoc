@@ -10,12 +10,12 @@
   // ---------------------------------------------------------------------------
 
   var ROLES = ["interviewed", "reviewer", "editor"];
-  var VIEWS = ["normal", "tabular", "overview", "template"];
+  var VIEWS = ["normal", "tabular", "overview", "template", "display"];
 
   var ROLE_VIEWS = {
-    interviewed: ["normal"],
-    reviewer: ["normal", "tabular", "overview"],
-    editor: ["normal", "tabular", "overview", "template"]
+    interviewed: ["normal", "display"],
+    reviewer: ["normal", "tabular", "overview", "display"],
+    editor: ["normal", "tabular", "overview", "template", "display"]
   };
 
   var DEFAULT_VIEW = {
@@ -35,10 +35,13 @@
 
   var QUESTION_TYPES = [
     "text", "checkbox", "yes_or_no", "yes_or_text", "no_or_text",
-    "radio", "dropdown", "info", "html", "review", "ignore"
+    "radio", "dropdown", "date", "info", "html", "review", "ignore"
   ];
 
-  var TEMPLATE_IDS = ["question_card", "reviewer_card", "editor_form", "onchange"];
+  var TEMPLATE_IDS = [
+    "question_card", "reviewer_card", "editor_form", "onchange",
+    "display_card", "display_reviewer_card", "header", "footer", "css"
+  ];
 
   // Field groups used by the tabular editor view.
   var GROUP_QUESTION = ["id", "category", "subcategory", "question", "default", "help", "answer"];
@@ -60,11 +63,11 @@
     { name: "question", label: "Question", ui: "textarea" },
     { name: "help", label: "Help", ui: "textarea" },
     { name: "required", label: "Required", ui: "checkbox" },
-    { name: "default", label: "Default value", ui: "text" },
+    { name: "default", label: "Default value", ui: "textarea" },
     { name: "rows", label: "Rows", ui: "number" },
-    { name: "options", label: "Options (JSON)", ui: "json_textarea" },
-    { name: "visible_if_id", label: "Visible if (question)", ui: "question_select" },
-    { name: "visible_if_value", label: "Visible if value", ui: "text" },
+    { name: "options", label: "Options", ui: "options_table" },
+    { name: "visible_if_id", label: "Visible if (question)", ui: "question_datalist" },
+    { name: "visible_if_value", label: "Visible if value", ui: "visibility_value_datalist" },
     { name: "weight", label: "Weight", ui: "number" },
     { name: "analysis", label: "Analysis", ui: "textarea" },
     { name: "answer", label: "Answer", ui: "textarea" },
@@ -83,26 +86,60 @@
     '{{#help}}<p class="q-help">{{help}}</p>{{/help}}' +
     '{{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}' +
     '<div class="q-answer-block" data-question-control></div>' +
-    '{{#_comment_readonly}}<div class="q-reviewer-comment">{{reviewer_comment}}</div>{{/_comment_readonly}}' +
     '<div data-review-control></div>' +
     '<div data-reviewer-comment-control></div>' +
     '{{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}' +
     '</section>';
 
   var DEFAULT_REVIEWER_CARD =
-    '<section class="q-card q-reviewer-card" data-question-id="{{id}}">' +
-    '<div class="q-card-head">' +
+    '<section class="q-card{{#_highlight_reviewer}} q-reviewer-card{{/_highlight_reviewer}}" data-question-id="{{id}}">' +
+    '<div class="q-card-head q-reviewer-head">' +
     '<h3 class="q-prompt">{{question}}</h3>' +
     '<span class="q-meta-pill q-status-{{review_status}}">{{_status_label}}</span>' +
+    '<div data-review-control></div>' +
     '{{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}' +
     '</div>' +
     '{{#analysis}}<p class="q-analysis">{{analysis}}</p>{{/analysis}}' +
     '{{#help}}<p class="q-help">{{help}}</p>{{/help}}' +
-    '<div class="q-answer-block" data-question-control></div>' +
-    '<div data-review-control></div>' +
+    '<!-- answer block intentionally absent for review cards -->' +
     '<div data-reviewer-comment-control></div>' +
     '{{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}' +
     '</section>';
+
+  var DEFAULT_DISPLAY_CARD =
+    '<div class="q-display-item" data-question-id="{{id}}">' +
+    '<p class="q-display-question">{{question}}</p>' +
+    '{{#_answer_display}}<p class="q-display-answer">{{_answer_display}}</p>{{/_answer_display}}' +
+    '{{#_has_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/_has_comment}}' +
+    '</div>';
+
+  var DEFAULT_DISPLAY_REVIEWER_CARD =
+    '<div class="q-display-reviewer-item" data-question-id="{{id}}">' +
+    '<p class="q-display-question q-display-reviewer-question">{{question}}</p>' +
+    '<p class="q-display-status q-status-{{review_status}}">{{_status_label}}</p>' +
+    '{{#reviewer_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/reviewer_comment}}' +
+    '</div>';
+
+  var DEFAULT_HEADER =
+    '<div>' +
+    '<p class="q-kicker">Questionnaire</p>' +
+    '<h1 id="questionnaire-title">{{title}}</h1>' +
+    '{{#version}}<p id="questionnaire-version" class="q-subtitle">{{version}}</p>{{/version}}' +
+    '</div>' +
+    '<div class="q-toolbar">' +
+    '<label><span>Role</span><select id="role-select"></select></label>' +
+    '<label data-roles="reviewer editor"><span>View</span><select id="view-select"></select></label>' +
+    '<div class="q-toolbar-actions">' +
+    '<label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV<input type="file" id="load-csv" accept=".csv,text/csv"></label>' +
+    '<button type="button" class="q-toolbar-action" id="save-csv" data-roles="reviewer editor">💾 Save CSV</button>' +
+    '<button type="button" class="q-toolbar-action" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>' +
+    '<button type="button" class="q-toolbar-action" id="save-html">💾 Save HTML</button>' +
+    '</div>' +
+    '</div>';
+
+  var DEFAULT_FOOTER =
+    '<button type="button" id="prev-category">Previous</button>' +
+    '<button type="button" id="next-category">Next</button>';
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -485,10 +522,14 @@
     question.visible_if_value = question.visible_if_value === null || typeof question.visible_if_value === "undefined"
       ? "" : String(question.visible_if_value);
     question.default = parseScalar(question.default);
-    question.answer = parseJsonField(
-      question.answer,
-      question.answer === "" || typeof question.answer === "undefined" ? null : parseScalar(question.answer)
-    );
+    var rawAns = question.answer;
+    if (rawAns === "" || typeof rawAns === "undefined") {
+      question.answer = null;
+    } else if (Array.isArray(rawAns) || (rawAns !== null && typeof rawAns === "object")) {
+      question.answer = null;
+    } else {
+      question.answer = parseScalar(rawAns);
+    }
 
     question.review_status = REVIEW_STATUSES.indexOf(question.review_status) !== -1
       ? question.review_status : "pending";
@@ -529,7 +570,7 @@
       config.roleLabels || {}
     );
     this.viewLabels = Object.assign(
-      { normal: "Normal", tabular: "Tabular", overview: "Overview", template: "Template" },
+      { normal: "Normal", tabular: "Tabular", overview: "Overview", template: "Template", display: "Document" },
       config.viewLabels || {}
     );
     this.statusLabels = Object.assign(
@@ -553,6 +594,9 @@
     // overridden by string overrides edited in the template view.
     this.templates = config.templates || {};
     this.templateOverrides = Object.assign({}, config.templateOverrides || {});
+    if (this.templateOverrides.css) {
+      this._applyCssOverride(this.templateOverrides.css);
+    }
 
     this.configOnChange = typeof config.onChange === "function" ? config.onChange : null;
     this.onChangeBody = typeof config.onChangeBody === "string" ? config.onChangeBody : "";
@@ -570,6 +614,12 @@
     this.validationErrors = {};
     this._suppressHash = false;
     this._codeMirror = null;
+    this._pendingScrollY = null;
+    this.showNormalQuestions = true;
+    this.showReviewerQuestions = true;
+    var initVis = this._defaultVisibility();
+    this.showNormalQuestions = initVis.showNormal;
+    this.showReviewerQuestions = initVis.showReviewer;
 
     this.setQuestions(config.questions || [], { silent: true });
 
@@ -758,6 +808,21 @@
     this.render();
   };
 
+  proto.sortByCategory = function () {
+    var self = this;
+    var categories = this.getCategories();
+    var sorted = [];
+    categories.forEach(function (cat) {
+      self.questions.forEach(function (q) {
+        if (q.category === cat) { sorted.push(q); }
+      });
+    });
+    this.questions = sorted;
+    this._pendingScrollY = W.scrollY || 0;
+    this.triggerChange({ type: "reorder" });
+    this.render();
+  };
+
   proto.indexOfQuestion = function (id) {
     for (var i = 0; i < this.questions.length; i += 1) {
       if (this.questions[i].id === id) {
@@ -777,6 +842,7 @@
     this.questions[index] = this.questions[next];
     this.questions[next] = tmp;
     this.triggerChange({ type: "move", question_id: id });
+    this._pendingScrollY = W.scrollY || 0;
     this.render();
   };
 
@@ -989,6 +1055,19 @@
     return this.role;
   };
 
+  proto._defaultVisibility = function () {
+    var showNormal = true;
+    var showReviewer = true;
+    if (this.role === "reviewer") {
+      if (this.view === "normal" || this.view === "display") {
+        showReviewer = false;
+      } else if (this.view === "overview") {
+        showNormal = false;
+      }
+    }
+    return { showNormal: showNormal, showReviewer: showReviewer };
+  };
+
   proto.setRole = function (role) {
     if (ROLES.indexOf(role) === -1) {
       return;
@@ -997,6 +1076,9 @@
     // Switching role moves to that role's default view.
     this.view = DEFAULT_VIEW[role];
     this.editingId = null;
+    var vis = this._defaultVisibility();
+    this.showNormalQuestions = vis.showNormal;
+    this.showReviewerQuestions = vis.showReviewer;
     this.updateHash();
     this.triggerChange({ type: "role", value: role });
     this.render();
@@ -1028,6 +1110,9 @@
       return;
     }
     this.view = view;
+    var vis = this._defaultVisibility();
+    this.showNormalQuestions = vis.showNormal;
+    this.showReviewerQuestions = vis.showReviewer;
     this.updateHash();
     this.triggerChange({ type: "view", value: view });
     this.render();
@@ -1098,6 +1183,7 @@
     }
     this.role = role;
     var view = parts.shift();
+    if (view === "doc") { view = "display"; }
     if (view && this.viewAvailable(view, role)) {
       this.view = view;
     } else {
@@ -1145,7 +1231,7 @@
       return;
     }
     this._suppressHash = true;
-    if (W.history && typeof W.history.pushState === "function") {
+    if (W.history && typeof W.history.pushState === "function" && W.location.protocol !== "file:") {
       try {
         W.history.pushState(null, "", newHash);
         return;
@@ -1170,25 +1256,22 @@
   // --- visibility -----------------------------------------------------------
 
   // Whether a question is shown for the current role + view, ignoring its
-  // conditional visibility expression.
+  // conditional visibility expression. Respects showNormalQuestions /
+  // showReviewerQuestions flags (reviewer & editor only).
   proto.passesRoleView = function (question) {
     if (question.type === "ignore") {
       return false;
     }
     if (question.type === "review") {
-      // Review questions: hidden for the interviewed role and in reviewer-normal;
-      // shown in reviewer-overview and for the editor role.
       if (this.role === "interviewed") {
         return false;
       }
-      if (this.role === "reviewer" && this.view === "normal") {
+      if (!this.showReviewerQuestions) {
         return false;
       }
       return true;
     }
-    // Non-review questions are hidden in reviewer-overview, which shows only
-    // the review questions.
-    if (this.role === "reviewer" && this.view === "overview") {
+    if ((this.role === "reviewer" || this.role === "editor") && !this.showNormalQuestions) {
       return false;
     }
     return true;
@@ -1279,6 +1362,9 @@
       this.view = DEFAULT_VIEW[this.role];
     }
     this.syncSelects();
+    this.syncHeaderControls();
+    this.renderHeader();
+    this.renderFooter();
     this.renderCategoryNav();
 
     var containers = this.containers;
@@ -1298,6 +1384,11 @@
         containers.questions.innerHTML = "";
       }
       this.renderTemplateEditor();
+    } else if (this.view === "display") {
+      this.renderDisplay();
+      if (containers.editor) {
+        containers.editor.innerHTML = "";
+      }
     } else {
       this.renderQuestions();
       this.renderEditorPanel();
@@ -1326,6 +1417,45 @@
       }).join("");
       viewSelect.value = this.view;
     }
+    // Visibility checkboxes — only shown in reviewer/editor roles.
+    var normalCb = doc.getElementById("show-normal-checkbox");
+    if (normalCb) {
+      normalCb.checked = this.showNormalQuestions;
+      if (!normalCb._qBound) {
+        normalCb._qBound = true;
+        normalCb.addEventListener("change", function () {
+          self.showNormalQuestions = normalCb.checked;
+          self.render();
+        });
+      }
+    }
+    var reviewerCb = doc.getElementById("show-reviewer-checkbox");
+    if (reviewerCb) {
+      reviewerCb.checked = this.showReviewerQuestions;
+      if (!reviewerCb._qBound) {
+        reviewerCb._qBound = true;
+        reviewerCb.addEventListener("change", function () {
+          self.showReviewerQuestions = reviewerCb.checked;
+          self.render();
+        });
+      }
+    }
+  };
+
+  proto.syncHeaderControls = function () {
+    var doc = W.document;
+    if (!doc) {
+      return;
+    }
+    var self = this;
+    doc.querySelectorAll("[data-roles]").forEach(function (el) {
+      var roles = el.getAttribute("data-roles").split(/\s+/).filter(Boolean);
+      el.hidden = roles.indexOf(self.role) === -1;
+    });
+    var shell = doc.querySelector(".q-shell");
+    if (shell) {
+      shell.classList.toggle("is-fullwidth", this.role === "editor");
+    }
   };
 
   proto.renderCategoryNav = function () {
@@ -1334,7 +1464,7 @@
       return;
     }
     var categories = this.getCategories();
-    if (categories.length <= 1 || this.view === "tabular" || this.view === "template") {
+    if (categories.length <= 1 || this.view === "tabular" || this.view === "template" || this.view === "display") {
       container.innerHTML = "";
       container.hidden = true;
       return;
@@ -1377,9 +1507,122 @@
     return '<div class="q-summary-block' + ragClass + '">' +
       '<div class="q-summary-label">' + escapeHtml(label) + "</div>" +
       '<div class="q-summary-counts">' + counts + "</div>" +
-      '<div class="q-summary-score">' + escapeHtml(scoreText) +
-      " (" + summary.total + " review)" + "</div>" +
+      '<div class="q-summary-score">' + escapeHtml(scoreText) + "</div>" +
+      '<div class="q-summary-total"><strong>' + summary.total + "</strong> review question(s)</div>" +
       "</div>";
+  };
+
+  proto.renderDisplay = function () {
+    var container = this.containers.questions;
+    if (!container) { return; }
+    var self = this;
+    var categories = this.getCategories();
+    var displayCardTpl = this.getTemplateBody("display_card");
+    var displayReviewerTpl = this.getTemplateBody("display_reviewer_card");
+    var html = '<div class="q-display">';
+    categories.forEach(function (cat) {
+      html += '<h2 class="q-display-category">' + escapeHtml(cat) + "</h2>";
+      self.questions.forEach(function (question) {
+        if (question.category !== cat) { return; }
+        if (!self.passesRoleView(question)) { return; }
+        if (!self.isQuestionVisible(question)) { return; }
+        var ctx = self.questionContext(question);
+        var tpl = question.type === "review" ? displayReviewerTpl : displayCardTpl;
+        html += W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+      });
+    });
+    html += "</div>";
+    container.innerHTML = html;
+    if (this.containers.editor) { this.containers.editor.innerHTML = ""; }
+  };
+
+  proto.renderHeader = function () {
+    var container = this.containers.header;
+    if (!container) { return; }
+    var tpl = this.getTemplateBody("header");
+    var ctx = {
+      title: this.config.title || "",
+      version: this.config.version || "",
+      id: this.config.id || "",
+      _role: this.role,
+      _view: this.view
+    };
+    container.innerHTML = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+    this.bindHeader(container);
+  };
+
+  proto.renderFooter = function () {
+    var container = this.containers.footer;
+    if (!container) { return; }
+    var tpl = this.getTemplateBody("footer");
+    var ctx = {
+      title: this.config.title || "",
+      version: this.config.version || "",
+      id: this.config.id || "",
+      _role: this.role,
+      _view: this.view
+    };
+    container.innerHTML = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+    this.bindHeader(container);
+  };
+
+  proto.bindHeader = function (container) {
+    var self = this;
+    var doc = W.document;
+    // Role select
+    var roleSelect = container.querySelector("#role-select") || (doc && doc.getElementById("role-select"));
+    if (roleSelect && !roleSelect._qBound) {
+      roleSelect._qBound = true;
+      roleSelect.addEventListener("change", function () {
+        self.setRole(roleSelect.value);
+      });
+    }
+    // View select
+    var viewSelect = container.querySelector("#view-select") || (doc && doc.getElementById("view-select"));
+    if (viewSelect && !viewSelect._qBound) {
+      viewSelect._qBound = true;
+      viewSelect.addEventListener("change", function () {
+        self.setView(viewSelect.value);
+      });
+    }
+    // Prev/Next
+    var prev = container.querySelector("#prev-category") || (doc && doc.getElementById("prev-category"));
+    if (prev && !prev._qBound) {
+      prev._qBound = true;
+      prev.addEventListener("click", function () { self.previousCategory(); });
+    }
+    var next = container.querySelector("#next-category") || (doc && doc.getElementById("next-category"));
+    if (next && !next._qBound) {
+      next._qBound = true;
+      next.addEventListener("click", function () { self.nextCategory(); });
+    }
+    // Save/Load
+    var saveHtml = container.querySelector("#save-html") || (doc && doc.getElementById("save-html"));
+    if (saveHtml && !saveHtml._qBound) {
+      saveHtml._qBound = true;
+      saveHtml.addEventListener("click", function () { self.saveHtmlFile(); });
+    }
+    var saveCsv = container.querySelector("#save-csv") || (doc && doc.getElementById("save-csv"));
+    if (saveCsv && !saveCsv._qBound) {
+      saveCsv._qBound = true;
+      saveCsv.addEventListener("click", function () { self.saveCsvFile(); });
+    }
+    var saveJson = container.querySelector("#save-json") || (doc && doc.getElementById("save-json"));
+    if (saveJson && !saveJson._qBound) {
+      saveJson._qBound = true;
+      saveJson.addEventListener("click", function () { self.saveJsonFile(); });
+    }
+    var loadCsv = container.querySelector("#load-csv") || (doc && doc.getElementById("load-csv"));
+    if (loadCsv && !loadCsv._qBound) {
+      loadCsv._qBound = true;
+      loadCsv.addEventListener("change", function () {
+        var file = loadCsv.files && loadCsv.files[0];
+        if (!file) { return; }
+        file.text().then(function (text) { self.loadCsv(text); });
+      });
+    }
+    this.syncHeaderControls();
+    this.syncSelects();
   };
 
   proto.currentQuestions = function () {
@@ -1420,17 +1663,29 @@
     return this.templateOverrides.question_card || getTemplateHtml(this.templates.questionCard) || DEFAULT_QUESTION_CARD;
   };
 
+  function answerDisplay(value) {
+    if (value === null || typeof value === "undefined") { return ""; }
+    if (value === true) { return "Yes"; }
+    if (value === false) { return "No"; }
+    return String(value);
+  }
+
   proto.questionContext = function (question) {
     var context = deepClone(question);
     context._role = this.role;
     context._view = this.view;
     context._editor = this.role === "editor";
+    context._reviewer = this.role === "reviewer";
+    context._interviewed = this.role === "interviewed";
     context._visible = this.isQuestionVisible(question);
     context._is_review = question.type === "review";
     context._category_title = question.category;
     context._status_label = this.statusLabels[question.review_status] || question.review_status;
     context._analysis_visible = (this.role === "reviewer" || this.role === "editor") && !!question.analysis;
     context._comment_readonly = this.role === "interviewed" && !!question.reviewer_comment;
+    context._has_comment = !!question.reviewer_comment;
+    context._highlight_reviewer = question.type === "review" && this.showNormalQuestions && this.showReviewerQuestions;
+    context._answer_display = answerDisplay(question.answer);
     var errors = this.validationErrors[question.id];
     context._errors = errors ? [errors] : [];
     var rag = this.ragClass(null);
@@ -1498,22 +1753,64 @@
     if (question.type === "no_or_text") {
       return this.renderYesNo(question, value, disabled, "no");
     }
+    if (question.type === "date") {
+      var dateVal = escapeHtml(value || "");
+      var todayBtn = disabled ? "" :
+        '<button type="button" class="q-date-today" data-date-today="' + id + '">Today</button>';
+      return '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.question) +
+        '</span><input type="date" data-answer="' + id + '" value="' + dateVal + '"' + disabled + ">" +
+        todayBtn + "</label>";
+    }
     if (question.type === "radio") {
-      return '<fieldset class="q-fieldset">' + (question.options || []).map(function (option) {
-        var optionChecked = ciEquals(value, option.value) ? " checked" : "";
-        return '<label class="q-choice"><input type="radio" name="' + id + '" data-answer="' + id +
+      var hasOtherRadio = (question.options || []).some(function (o) { return o.is_other; });
+      var selectedOtherRadio = hasOtherRadio && (question.options || []).some(function (o) {
+        return o.is_other && ciEquals(value, o.value);
+      });
+      var otherTextRadio = (hasOtherRadio && !selectedOtherRadio && typeof value === "string" && value !== "")
+        ? value : "";
+      var radioValue = hasOtherRadio && !selectedOtherRadio && typeof value === "string" && value !== ""
+        ? ((question.options || []).find(function (o) { return o.is_other; }) || {}).value || ""
+        : value;
+      var radioMarkup = '<fieldset class="q-fieldset">' + (question.options || []).map(function (option) {
+        var optionChecked = ciEquals(radioValue, option.value) ? " checked" : "";
+        return '<label class="q-choice"><input type="radio" name="' + id + '" data-other="' + id +
           '" value="' + escapeHtml(optionValueToString(option.value)) + '"' + optionChecked + disabled +
+          (option.is_other ? ' data-is-other="1"' : "") +
           "><span>" + escapeHtml(option.label || option.value) + "</span></label>";
       }).join("") + "</fieldset>";
+      if (hasOtherRadio) {
+        var showOtherRadio = selectedOtherRadio || otherTextRadio !== "";
+        radioMarkup += '<label class="q-subfield q-other-text"' + (showOtherRadio ? "" : " hidden") + ">" +
+          "<span>Please specify</span>" +
+          '<input type="text" data-other-text="' + id + '" value="' + escapeHtml(otherTextRadio) + '"' + disabled + ">" +
+          "</label>";
+      }
+      return radioMarkup;
     }
     if (question.type === "dropdown") {
-      return '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.question) +
-        '</span><select data-answer="' + id + '"' + disabled + '><option value=""></option>' +
+      var hasOtherDrop = (question.options || []).some(function (o) { return o.is_other; });
+      var otherOption = hasOtherDrop ? (question.options || []).find(function (o) { return o.is_other; }) : null;
+      var selectedOtherDrop = hasOtherDrop && ciEquals(value, otherOption && otherOption.value);
+      var dropTextValue = (hasOtherDrop && !selectedOtherDrop && typeof value === "string" && value !== "")
+        ? value : "";
+      var dropValue = (hasOtherDrop && !selectedOtherDrop && typeof value === "string" && value !== "")
+        ? (otherOption ? otherOption.value : "") : value;
+      var dropMarkup = '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.question) +
+        '</span><select data-other="' + id + '"' + disabled + '><option value=""></option>' +
         (question.options || []).map(function (option) {
-          var selected = ciEquals(value, option.value) ? " selected" : "";
-          return '<option value="' + escapeHtml(optionValueToString(option.value)) + '"' + selected + ">" +
+          var selected = ciEquals(dropValue, option.value) ? " selected" : "";
+          return '<option value="' + escapeHtml(optionValueToString(option.value)) + '"' + selected +
+            (option.is_other ? ' data-is-other="1"' : "") + ">" +
             escapeHtml(option.label || option.value) + "</option>";
         }).join("") + "</select></label>";
+      if (hasOtherDrop) {
+        var showOtherDrop = selectedOtherDrop || dropTextValue !== "";
+        dropMarkup += '<label class="q-subfield q-other-text"' + (showOtherDrop ? "" : " hidden") + ">" +
+          "<span>Please specify</span>" +
+          '<input type="text" data-other-text="' + id + '" value="' + escapeHtml(dropTextValue) + '"' + disabled + ">" +
+          "</label>";
+      }
+      return dropMarkup;
     }
     // text and review use a text input / textarea
     var rows = Number(question.rows || 1);
@@ -1528,7 +1825,7 @@
       "></label>";
   };
 
-  // mode: false (yes_or_no), "yes" (yes_or_text), "no" (no_or_text)
+  // mode: false (yes_or_no), "yes" (yes_or_text: text on No), "no" (no_or_text: text on Yes)
   proto.renderYesNo = function (question, value, disabled, mode) {
     var id = escapeHtml(question.id);
     var bool = boolToken(value);
@@ -1536,11 +1833,13 @@
     var yesSelected;
     var noSelected;
     if (mode === "yes") {
-      yesSelected = bool === true || isString;
-      noSelected = bool === false;
-    } else if (mode === "no") {
+      // yes_or_text: answer is true (Yes) or string/false (No); text shown on No
       yesSelected = bool === true;
       noSelected = bool === false || isString;
+    } else if (mode === "no") {
+      // no_or_text: answer is false (No) or string/true (Yes); text shown on Yes
+      yesSelected = bool === true || isString;
+      noSelected = bool === false;
     } else {
       yesSelected = bool === true;
       noSelected = bool === false;
@@ -1552,11 +1851,19 @@
       '" value="no"' + (noSelected ? " checked" : "") + disabled + "><span>No</span></label>" +
       "</fieldset>";
     if (mode) {
-      var showText = mode === "yes" ? yesSelected : noSelected;
+      var showText = mode === "yes" ? noSelected : yesSelected;
       var textValue = isString ? value : "";
+      var rows = Number(question.rows || 1);
+      var textControl;
+      if (rows > 1) {
+        textControl = '<textarea data-yesno-text="' + id + '" rows="' + rows + '"' + disabled + ">" +
+          escapeHtml(textValue) + "</textarea>";
+      } else {
+        textControl = '<input type="text" data-yesno-text="' + id + '" value="' +
+          escapeHtml(textValue) + '"' + disabled + ">";
+      }
       markup += '<label class="q-subfield q-yesno-text"' + (showText ? "" : ' hidden') + ">" +
-        "<span>Details</span><input type=\"text\" data-yesno-text=\"" + id + "\" value=\"" +
-        escapeHtml(textValue) + '"' + disabled + "></label>";
+        "<span>Details</span>" + textControl + "</label>";
     }
     return markup;
   };
@@ -1578,12 +1885,19 @@
   };
 
   proto.renderCommentControl = function (question) {
+    var id = escapeHtml(question.id);
+    if (this.role === "interviewed") {
+      if (!question.reviewer_comment) { return ""; }
+      return '<aside class="q-comment-balloon"><p class="q-comment-balloon-text">' +
+        escapeHtml(question.reviewer_comment) + "</p></aside>";
+    }
     if (this.role !== "reviewer" && this.role !== "editor") {
       return "";
     }
-    var id = escapeHtml(question.id);
-    return '<label class="q-review-field q-comment-field"><span>Reviewer comment</span>' +
-      '<textarea data-comment="' + id + '">' + escapeHtml(question.reviewer_comment || "") + "</textarea></label>";
+    return '<aside class="q-comment-balloon q-comment-balloon-edit">' +
+      '<label class="q-review-field q-comment-field"><span>Reviewer comment</span>' +
+      '<textarea data-comment="' + id + '">' + escapeHtml(question.reviewer_comment || "") + "</textarea></label>" +
+      "</aside>";
   };
 
   proto.bindQuestionControls = function (container) {
@@ -1618,6 +1932,31 @@
         self.handleYesNoChange(element.getAttribute("data-yesno-text"));
       });
     });
+    container.querySelectorAll("[data-other]").forEach(function (element) {
+      element.addEventListener("change", function () {
+        self.handleOtherChange(element.getAttribute("data-other"));
+      });
+    });
+    container.querySelectorAll("[data-other-text]").forEach(function (element) {
+      element.addEventListener("input", function () {
+        self.handleOtherChange(element.getAttribute("data-other-text"));
+      });
+    });
+    container.querySelectorAll("[data-date-today]").forEach(function (element) {
+      element.addEventListener("click", function () {
+        var qid = element.getAttribute("data-date-today");
+        var card = container.querySelector('[data-question-id="' + cssEscape(qid) + '"]');
+        var dateInput = card && card.querySelector('[data-answer="' + cssEscape(qid) + '"]');
+        if (!dateInput) { return; }
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, "0");
+        var d = String(now.getDate()).padStart(2, "0");
+        var today = y + "-" + m + "-" + d;
+        dateInput.value = today;
+        self.setAnswer(qid, today);
+      });
+    });
 
     container.querySelectorAll("[data-review-status]").forEach(function (element) {
       element.addEventListener("change", function () {
@@ -1634,6 +1973,43 @@
         self.openEditor(element.getAttribute("data-edit-question"));
       });
     });
+  };
+
+  proto.handleOtherChange = function (id) {
+    var container = this.containers.questions;
+    var question = this.getQuestion(id);
+    if (!container || !question) { return; }
+    var card = container.querySelector('[data-question-id="' + cssEscape(id) + '"]');
+    if (!card) { return; }
+    var otherTextInput = card.querySelector('[data-other-text="' + cssEscape(id) + '"]');
+    var otherTextWrap = otherTextInput ? otherTextInput.closest(".q-other-text") : null;
+    var isOtherSelected;
+    var value;
+    if (question.type === "radio") {
+      var checkedRadio = card.querySelector('[data-other="' + cssEscape(id) + '"]:checked');
+      isOtherSelected = !!(checkedRadio && checkedRadio.getAttribute("data-is-other"));
+      if (isOtherSelected) {
+        if (otherTextWrap) { otherTextWrap.hidden = false; }
+        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : null;
+      } else {
+        if (otherTextWrap) { otherTextWrap.hidden = true; }
+        value = checkedRadio ? parseScalar(checkedRadio.value) : null;
+      }
+    } else if (question.type === "dropdown") {
+      var selectEl = card.querySelector('[data-other="' + cssEscape(id) + '"]');
+      var selectedOption = selectEl && selectEl.options[selectEl.selectedIndex];
+      isOtherSelected = !!(selectedOption && selectedOption.getAttribute("data-is-other"));
+      if (isOtherSelected) {
+        if (otherTextWrap) { otherTextWrap.hidden = false; }
+        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : null;
+      } else {
+        if (otherTextWrap) { otherTextWrap.hidden = true; }
+        value = selectEl ? parseScalar(selectEl.value) : null;
+      }
+    } else {
+      return;
+    }
+    this.setAnswer(id, value, { deferRender: true });
   };
 
   proto.handleYesNoChange = function (id) {
@@ -1653,21 +2029,21 @@
     var value;
 
     if (question.type === "yes_or_text") {
-      if (choice === "no") {
-        value = false;
-        if (textWrap) { textWrap.hidden = true; }
-      } else if (choice === "yes") {
-        value = textInput && textInput.value !== "" ? textInput.value : true;
-        if (textWrap) { textWrap.hidden = false; }
-      } else {
-        value = null;
-      }
-    } else if (question.type === "no_or_text") {
       if (choice === "yes") {
         value = true;
         if (textWrap) { textWrap.hidden = true; }
       } else if (choice === "no") {
         value = textInput && textInput.value !== "" ? textInput.value : false;
+        if (textWrap) { textWrap.hidden = false; }
+      } else {
+        value = null;
+      }
+    } else if (question.type === "no_or_text") {
+      if (choice === "no") {
+        value = false;
+        if (textWrap) { textWrap.hidden = true; }
+      } else if (choice === "yes") {
+        value = textInput && textInput.value !== "" ? textInput.value : true;
         if (textWrap) { textWrap.hidden = false; }
       } else {
         value = null;
@@ -1683,6 +2059,11 @@
   }
 
   proto.flushPendingScroll = function () {
+    if (this._pendingScrollY !== null && typeof this._pendingScrollY !== "undefined") {
+      var savedY = this._pendingScrollY;
+      this._pendingScrollY = null;
+      if (W.scrollTo) { W.scrollTo(0, savedY); }
+    }
     if (!this._pendingScrollId) {
       return;
     }
@@ -1782,6 +2163,9 @@
       var name = slot.getAttribute("data-editor-field");
       var field = fieldMap[name] || { name: name, label: name, ui: "text" };
       slot.classList.add("q-editor-slot");
+      if (field.ui === "options_table") {
+        slot.classList.add("is-wide");
+      }
       slot.innerHTML = self.renderEditorField(question, field);
     });
     return form.outerHTML;
@@ -1791,6 +2175,10 @@
     var value = question[field.name];
     var name = escapeHtml(field.name);
     var input;
+    if (field.ui === "options_table") {
+      return '<div class="q-editor-field is-wide"><span>' + escapeHtml(field.label || field.name) + "</span>" +
+        this.renderOptionsEditor(question) + "</div>";
+    }
     if (field.ui === "checkbox") {
       input = '<input type="checkbox" data-editor-field="' + name + '"' + (value ? " checked" : "") + ">";
     } else if (field.ui === "textarea" || field.ui === "json_textarea") {
@@ -1807,11 +2195,119 @@
         var selected = value === item.id ? " selected" : "";
         return '<option value="' + escapeHtml(item.id) + '"' + selected + ">" + escapeHtml(item.id) + "</option>";
       }).join("") + "</select>";
+    } else if (field.ui === "question_datalist") {
+      var dlId = "qlist-" + escapeHtml(question.id);
+      input = '<input type="text" list="' + dlId + '" data-editor-field="' + name +
+        '" value="' + escapeHtml(displayValue(value)) + '">' +
+        '<datalist id="' + dlId + '">' +
+        this.questions.map(function (item) {
+          return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.id) + "</option>";
+        }).join("") + "</datalist>";
+    } else if (field.ui === "visibility_value_datalist") {
+      var vdlId = "vlist-" + escapeHtml(question.id);
+      var targetQ = question.visible_if_id ? this.getQuestion(question.visible_if_id) : null;
+      var targetOpts = (targetQ && targetQ.options) || [];
+      var baseKeywords = ["true", "false", "other", "!true", "!false", "!other"];
+      var optionValues = targetOpts.map(function (o) { return optionValueToString(o.value); });
+      var negated = optionValues.map(function (v) { return "!" + v; });
+      var allValues = baseKeywords.concat(optionValues).concat(negated);
+      input = '<input type="text" list="' + vdlId + '" data-editor-field="' + name +
+        '" value="' + escapeHtml(displayValue(value)) + '">' +
+        '<datalist id="' + vdlId + '">' +
+        allValues.map(function (v) {
+          return '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + "</option>";
+        }).join("") + "</datalist>";
     } else {
       input = '<input type="' + (field.ui === "number" ? "number" : "text") + '" data-editor-field="' + name +
         '" value="' + escapeHtml(displayValue(value)) + '">';
     }
     return '<label class="q-editor-field"><span>' + escapeHtml(field.label || field.name) + "</span>" + input + "</label>";
+  };
+
+  proto.renderOptionsEditor = function (question) {
+    var rows = (question.options || []).map(function (option, index) {
+      return '<tr data-option-index="' + index + '">' +
+        '<td><input type="text" data-option-field="value" value="' + escapeHtml(optionValueToString(option.value)) + '"></td>' +
+        '<td><input type="text" data-option-field="label" value="' + escapeHtml(option.label || "") + '"></td>' +
+        '<td class="q-option-other"><input type="checkbox" data-option-field="is_other"' + (option.is_other ? " checked" : "") + '></td>' +
+        '<td class="q-option-actions">' +
+        '<button type="button" data-option-up title="Move up">↑</button>' +
+        '<button type="button" data-option-down title="Move down">↓</button>' +
+        '<button type="button" data-option-delete title="Delete">🗑️</button>' +
+        '</td></tr>';
+    }).join("");
+    return '<div class="q-options-editor">' +
+      '<table><thead><tr><th>Value</th><th>Label</th><th>Other</th><th>Actions</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>' +
+      '<button type="button" data-option-add>➕ Add option</button>' +
+      '</div>';
+  };
+
+  proto.bindOptionsEditor = function (panel, id) {
+    var self = this;
+    var optionsEditor = panel.querySelector(".q-options-editor");
+    if (!optionsEditor) {
+      return;
+    }
+
+    function collectOptions() {
+      var options = [];
+      optionsEditor.querySelectorAll("[data-option-index]").forEach(function (row) {
+        options.push({
+          value: parseScalar(row.querySelector('[data-option-field="value"]').value),
+          label: row.querySelector('[data-option-field="label"]').value,
+          is_other: row.querySelector('[data-option-field="is_other"]').checked
+        });
+      });
+      return options;
+    }
+
+    optionsEditor.querySelectorAll("[data-option-field]").forEach(function (input) {
+      input.addEventListener(input.type === "checkbox" ? "change" : "input", function () {
+        self.updateQuestionField(id, "options", collectOptions(), { deferRender: true });
+      });
+    });
+
+    optionsEditor.querySelectorAll("[data-option-up]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var row = button.closest("[data-option-index]");
+        var prev = row && row.previousElementSibling;
+        if (prev) {
+          row.parentNode.insertBefore(row, prev);
+          self.updateQuestionField(id, "options", collectOptions());
+        }
+      });
+    });
+
+    optionsEditor.querySelectorAll("[data-option-down]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var row = button.closest("[data-option-index]");
+        var next = row && row.nextElementSibling;
+        if (next) {
+          row.parentNode.insertBefore(next, row);
+          self.updateQuestionField(id, "options", collectOptions());
+        }
+      });
+    });
+
+    optionsEditor.querySelectorAll("[data-option-delete]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var row = button.closest("[data-option-index]");
+        if (row) {
+          row.remove();
+          self.updateQuestionField(id, "options", collectOptions());
+        }
+      });
+    });
+
+    var add = optionsEditor.querySelector("[data-option-add]");
+    if (add) {
+      add.addEventListener("click", function () {
+        var opts = collectOptions();
+        opts.push({ value: "", label: "", is_other: false });
+        self.updateQuestionField(id, "options", opts);
+      });
+    }
   };
 
   proto.bindEditorForm = function (container, id) {
@@ -1826,7 +2322,7 @@
         self.closeEditor();
       });
     }
-    panel.querySelectorAll("[data-editor-field]").forEach(function (input) {
+    panel.querySelectorAll("input[data-editor-field], select[data-editor-field], textarea[data-editor-field]").forEach(function (input) {
       var isImmediate = input.type === "checkbox" || input.tagName === "SELECT";
       input.addEventListener(isImmediate ? "change" : "input", function () {
         var field = input.getAttribute("data-editor-field");
@@ -1834,6 +2330,7 @@
         self.updateQuestionField(id, field, value, { deferRender: !isImmediate && field !== "id" });
       });
     });
+    this.bindOptionsEditor(panel, id);
   };
 
   // --- tabular view ---------------------------------------------------------
@@ -1882,7 +2379,8 @@
     });
 
     var addButton = this.role === "editor"
-      ? '<button type="button" class="q-tabular-add" data-tabular-add>➕ Add question</button>' : "";
+      ? '<button type="button" class="q-tabular-add" data-tabular-add>➕ Add question</button>' +
+        '<button type="button" class="q-tabular-sort" data-tabular-sort-category>Sort by category</button>' : "";
     var groupHeader = '<tr class="q-tabular-groups">' +
       '<th class="q-tabular-controls-head"></th>' +
       '<th class="q-tabular-group-question" colspan="' + groups.question.length + '">Question</th>' +
@@ -1904,8 +2402,8 @@
       '<div class="q-tabular-toolbar"><label class="q-editor-search"><span>🔍 Search</span>' +
       '<input type="search" data-tabular-search value="' + escapeHtml(search) +
       '" placeholder="ID, question, or answer"></label>' + addButton + "</div>" +
-      '<div class="q-tabular-scroll"><table class="q-tabular-table"><thead>' + groupHeader + columnHeader +
-      "</thead><tbody>" + body + "</tbody></table></div></div>";
+      '<table class="q-tabular-table"><thead>' + groupHeader + columnHeader +
+      "</thead><tbody>" + body + "</tbody></table></div>";
 
     this.bindTabular(container);
     this.renderEditorPanel();
@@ -1913,19 +2411,22 @@
 
   proto.renderTabularRow = function (question, groups, columns) {
     var self = this;
+    var id = escapeHtml(question.id);
     var index = this.indexOfQuestion(question.id);
-    var controls = '<td class="q-tabular-controls">' +
-      '<button type="button" data-tabular-up="' + escapeHtml(question.id) + '"' + (index === 0 ? " disabled" : "") + ' title="Move up">↑</button>' +
-      '<button type="button" data-tabular-down="' + escapeHtml(question.id) + '"' + (index === this.questions.length - 1 ? " disabled" : "") + ' title="Move down">↓</button>' +
-      '<button type="button" data-tabular-edit="' + escapeHtml(question.id) + '" title="Edit">✏️</button>' +
-      '<button type="button" data-tabular-delete="' + escapeHtml(question.id) + '" title="Delete">🗑️</button>' +
-      "</td>";
+    var isEditor = this.role === "editor";
+    var normalLink = '<a class="q-tabular-normalview" href="#normal-' + id + '" draggable="false" title="Normal view">⤴</a>';
+    var dragHandle = isEditor ? '<span class="q-drag-handle" draggable="true" data-drag-for="' + id + '" title="Drag to reorder">⠿</span>' : "";
+    var upBtn = isEditor ? '<button type="button" data-tabular-up="' + id + '"' + (index === 0 ? " disabled" : "") + ' title="Move up">↑</button>' : "";
+    var downBtn = isEditor ? '<button type="button" data-tabular-down="' + id + '"' + (index === this.questions.length - 1 ? " disabled" : "") + ' title="Move down">↓</button>' : "";
+    var editBtn = isEditor ? '<button type="button" data-tabular-edit="' + id + '" title="Edit">✏️</button>' : "";
+    var deleteBtn = isEditor ? '<button type="button" data-tabular-delete="' + id + '" title="Delete">🗑️</button>' : "";
+    var controls = '<td class="q-tabular-controls">' + dragHandle + normalLink + upBtn + downBtn + editBtn + deleteBtn + "</td>";
     var cells = columns.map(function (column) {
       var groupClass = groups.question.indexOf(column) !== -1 ? "q-tabular-group-question"
         : groups.ui.indexOf(column) !== -1 ? "q-tabular-group-ui" : "q-tabular-group-optional";
       return '<td class="' + groupClass + '">' + self.renderTabularCell(question, column) + "</td>";
     }).join("");
-    return '<tr data-tabular-row="' + escapeHtml(question.id) + '">' + controls + cells + "</tr>";
+    return '<tr data-tabular-row="' + id + '">' + controls + cells + "</tr>";
   };
 
   proto.renderTabularCell = function (question, column) {
@@ -1964,7 +2465,7 @@
       return '<input type="number" data-tabular-field="' + column + '" data-tabular-id="' + id +
         '" value="' + escapeHtml(displayValue(value)) + '">';
     }
-    if (column === "question" || column === "help" || column === "analysis" || column === "reviewer_comment" || column === "answer") {
+    if (column === "question" || column === "help" || column === "analysis" || column === "reviewer_comment" || column === "answer" || column === "default") {
       return '<textarea data-tabular-field="' + column + '" data-tabular-id="' + id + '" rows="1">' +
         escapeHtml(displayValue(value)) + "</textarea>";
     }
@@ -2025,6 +2526,63 @@
         }
       });
     });
+
+    var sortBtn = container.querySelector("[data-tabular-sort-category]");
+    if (sortBtn) {
+      sortBtn.addEventListener("click", function () {
+        self.sortByCategory();
+      });
+    }
+
+    // §1 — normal view links (anchor navigation)
+    container.querySelectorAll(".q-tabular-normalview").forEach(function (link) {
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        var href = link.getAttribute("href") || "";
+        var qid = href.replace(/^#normal-/, "");
+        self.navigateTo({ view: "normal", id: qid });
+      });
+    });
+
+    // §16 — drag-and-drop reorder (editor only)
+    if (self.role === "editor") {
+      var tbody = container.querySelector(".q-tabular-table tbody");
+      if (!tbody) { return; }
+      var dragSourceId = null;
+      tbody.querySelectorAll("[data-drag-for]").forEach(function (handle) {
+        handle.addEventListener("dragstart", function (e) {
+          dragSourceId = handle.getAttribute("data-drag-for");
+          var row = handle.closest("[data-tabular-row]");
+          if (row) { row.classList.add("q-drag-source"); }
+          e.dataTransfer.setData("text/plain", dragSourceId);
+          e.dataTransfer.effectAllowed = "move";
+        });
+      });
+      tbody.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        var row = e.target.closest("[data-tabular-row]");
+        tbody.querySelectorAll(".q-drag-over").forEach(function (el) { el.classList.remove("q-drag-over"); });
+        if (row) { row.classList.add("q-drag-over"); }
+      });
+      tbody.addEventListener("drop", function (e) {
+        e.preventDefault();
+        var row = e.target.closest("[data-tabular-row]");
+        var targetId = row ? row.getAttribute("data-tabular-row") : null;
+        if (dragSourceId && targetId && dragSourceId !== targetId) {
+          self._pendingScrollY = W.scrollY || 0;
+          self.moveQuestion(dragSourceId, { before: targetId });
+        }
+        tbody.querySelectorAll(".q-drag-over").forEach(function (el) { el.classList.remove("q-drag-over"); });
+        tbody.querySelectorAll(".q-drag-source").forEach(function (el) { el.classList.remove("q-drag-source"); });
+        dragSourceId = null;
+      });
+      tbody.addEventListener("dragend", function () {
+        tbody.querySelectorAll(".q-drag-source").forEach(function (el) { el.classList.remove("q-drag-source"); });
+        tbody.querySelectorAll(".q-drag-over").forEach(function (el) { el.classList.remove("q-drag-over"); });
+        dragSourceId = null;
+      });
+    }
   };
 
   // --- template view --------------------------------------------------------
@@ -2045,7 +2603,33 @@
     if (templateId === "editor_form") {
       return getTemplateHtml(this.templates.editorForm) || "";
     }
+    if (templateId === "display_card") {
+      return DEFAULT_DISPLAY_CARD;
+    }
+    if (templateId === "display_reviewer_card") {
+      return DEFAULT_DISPLAY_REVIEWER_CARD;
+    }
+    if (templateId === "header") {
+      return getTemplateHtml(this.templates.header) || DEFAULT_HEADER;
+    }
+    if (templateId === "footer") {
+      return getTemplateHtml(this.templates.footer) || DEFAULT_FOOTER;
+    }
+    if (templateId === "css") {
+      return this._collectInlineCss();
+    }
     return "";
+  };
+
+  proto._collectInlineCss = function () {
+    var doc = W.document;
+    if (!doc) { return ""; }
+    var parts = [];
+    Array.prototype.forEach.call(doc.querySelectorAll("style:not(#q-custom-css)"), function (s) {
+      var text = s.textContent.trim();
+      if (text) { parts.push(text); }
+    });
+    return parts.join("\n\n");
   };
 
   proto.setTemplateBody = function (templateId, body) {
@@ -2055,7 +2639,27 @@
     } else {
       this.templateOverrides[templateId] = body;
     }
+    if (templateId === "css") {
+      this._applyCssOverride(body);
+    }
     this.triggerChange({ type: "template", template_id: templateId });
+  };
+
+  proto._applyCssOverride = function (css) {
+    var doc = W.document;
+    if (!doc) { return; }
+    var styleId = "q-custom-css";
+    var el = doc.getElementById(styleId);
+    if (!el) {
+      el = doc.createElement("style");
+      el.id = styleId;
+      doc.head.appendChild(el);
+      // Disable pre-existing inline <style> blocks so the edited CSS fully replaces them.
+      Array.prototype.forEach.call(doc.querySelectorAll("style:not(#" + styleId + ")"), function (s) {
+        if (s.sheet) { s.sheet.disabled = true; }
+      });
+    }
+    el.textContent = css || "";
   };
 
   proto.renderTemplateEditor = function () {
@@ -2090,7 +2694,9 @@
     if (!textarea) {
       return;
     }
-    var mode = this.selectedTemplateId === "onchange" ? "javascript" : "htmlmixed";
+    var mode = this.selectedTemplateId === "onchange" ? "javascript"
+      : this.selectedTemplateId === "css" ? "css"
+      : "htmlmixed";
 
     if (W.CodeMirror) {
       this._codeMirror = W.CodeMirror.fromTextArea(textarea, {
@@ -2172,7 +2778,7 @@
   proto.collectTemplateOverrides = function () {
     var result = {};
     var self = this;
-    ["question_card", "reviewer_card", "editor_form"].forEach(function (templateId) {
+    TEMPLATE_IDS.forEach(function (templateId) {
       if (Object.prototype.hasOwnProperty.call(self.templateOverrides, templateId)) {
         result[templateId] = self.templateOverrides[templateId];
       }

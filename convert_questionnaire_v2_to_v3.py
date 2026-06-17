@@ -75,7 +75,7 @@ KNOWN_FIELDS = [
     "analysis",
 ]
 
-JSON_STRING_COLUMNS = {"options", "answer", "default"}
+JSON_STRING_COLUMNS = {"options"}
 
 
 def read_data(path: Path) -> Any:
@@ -182,7 +182,7 @@ def convert_question(raw: dict[str, Any], index: int) -> dict[str, Any]:
     if "options" in converted:
         converted["options"] = normalize_options(converted["options"])
     if "answer" in converted:
-        converted["answer"] = maybe_json(converted["answer"])
+        converted["answer"] = coerce_bool(converted["answer"])
     if "rows" in converted and converted["rows"] not in (None, ""):
         try:
             converted["rows"] = int(converted["rows"])

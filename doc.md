@@ -115,7 +115,7 @@ On the next page load, the initialization code reads these blocks and restores s
 
 ## Templates
 
-Templates use [Mustache.js](https://github.com/janl/mustache.js) syntax. Three templates exist; all are optional — the library has built-in fallbacks.
+Templates use [Mustache.js](https://github.com/janl/mustache.js) syntax. All templates are optional — the library has built-in fallbacks for every slot. Templates can also be edited live in the browser under editor role → template view, and are saved with the file.
 
 ### Question Card Template (`question_card`)
 
@@ -138,12 +138,9 @@ Renders one question in normal and overview views. The library injects interacti
     <!-- Library injects the answer control here -->
     <div class="q-answer-block" data-question-control></div>
 
-    <!-- Reviewer comment shown read-only (blue) to interviewed users -->
-    {{#_comment_readonly}}<div class="q-reviewer-comment">{{reviewer_comment}}</div>{{/_comment_readonly}}
-
     <!-- Library injects the review status control (review-type, reviewer/editor) -->
     <div data-review-control></div>
-    <!-- Library injects the editable reviewer comment (reviewer/editor) -->
+    <!-- Library injects the reviewer comment balloon (side annotation for all roles) -->
     <div data-reviewer-comment-control></div>
 
     {{#_errors}}
@@ -159,7 +156,7 @@ Renders one question in normal and overview views. The library injects interacti
 | --- | --- | --- |
 | All question fields | — | `id`, `category`, `question`, `help`, `answer`, `review_status`, `reviewer_comment`, `weight`, `analysis`, etc. |
 | `_role` | string | Current role (`interviewed`, `reviewer`, `editor`) |
-| `_view` | string | Current view (`normal`, `tabular`, `overview`, `template`) |
+| `_view` | string | Current view (`normal`, `tabular`, `overview`, `template`, `display`) |
 | `_editor` | boolean | `true` when the role is `editor` |
 | `_visible` | boolean | Whether the question passes its visibility condition |
 | `_is_review` | boolean | `true` if `type === "review"` |
@@ -167,6 +164,8 @@ Renders one question in normal and overview views. The library injects interacti
 | `_status_label` | string | Configured label for the current `review_status` |
 | `_analysis_visible` | boolean | `true` when `analysis` exists and role is `reviewer`/`editor` |
 | `_comment_readonly` | boolean | `true` when role is `interviewed` and a `reviewer_comment` exists |
+| `_has_comment` | boolean | `true` when a `reviewer_comment` is set |
+| `_answer_display` | string | Answer formatted for display: `true`→`"Yes"`, `false`→`"No"`, `null`→`""`, string→as-is |
 | `_errors` | string[] | Validation error messages for this question |
 
 The library fills three control slots regardless of the template: `data-question-control` (answer), `data-review-control` (review status), and `data-reviewer-comment-control` (editable comment). The latter two are left empty when not applicable to the current role and question type.
@@ -382,6 +381,7 @@ The URL hash reflects the current state as `#role-view` or `#role-view-id`:
 | Hash | Meaning |
 | --- | --- |
 | `#interviewed-normal` | Interviewed role, normal view |
+| `#interviewed-display` | Interviewed role, Document view (alias: `#interviewed-doc`) |
 | `#reviewer-overview` | Reviewer role, overview (summary panel visible) |
 | `#reviewer-normal-governance` | Reviewer, normal view, "governance" category |
 | `#reviewer-normal-q_has_conflicts` | Reviewer, normal view, scrolled to that question |
@@ -389,6 +389,20 @@ The URL hash reflects the current state as `#role-view` or `#role-view-id`:
 | `#editor-template-onchange` | Editor, template view, onChange tab open |
 
 Share a URL with a specific hash to deep-link reviewers directly to a category or question.
+
+The `display` view is also reachable by the short alias `doc` in the hash (e.g. `#interviewed-doc`). The view label in the dropdown defaults to `"Document"`; override via `viewLabels: { display: "My Label" }` in the config.
+
+### Document View (`display`)
+
+The Document view renders all questions as a single printable page — no pagination, no input controls. Categories appear as headings. Each question shows:
+
+- The question text
+- The answer (booleans shown as `Yes`/`No`, empty if unanswered)
+- Reviewer comment (shown as a balloon for interviewed, inline for reviewer/editor)
+
+Two editable templates control the output: `display_card` (normal questions) and `display_reviewer_card` (review-type questions). Both accept all standard context variables plus `_answer_display`.
+
+The Document view is available to all roles (interviewed, reviewer, editor).
 
 ---
 

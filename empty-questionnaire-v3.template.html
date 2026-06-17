@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Questionnaire</title>
     <link rel="stylesheet" href="questionnaire.css">
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5/lib/codemirror.css">
   </head>
   <body>
     <div class="q-shell">
@@ -23,13 +24,21 @@
             <span>View</span>
             <select id="view-select"></select>
           </label>
+          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
+            <input type="checkbox" id="show-normal-checkbox" checked>
+            <span>Normal</span>
+          </label>
+          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
+            <input type="checkbox" id="show-reviewer-checkbox" checked>
+            <span>Reviewer</span>
+          </label>
           <div class="q-toolbar-actions">
             <label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV
               <input type="file" id="load-csv" accept=".csv,text/csv">
             </label>
             <button type="button" class="q-toolbar-action" id="save-csv" data-roles="reviewer editor">💾 Save CSV</button>
             <button type="button" class="q-toolbar-action" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>
-            <button type="button" class="q-toolbar-action" id="save-html">💾 Save HTML</button>
+            <button type="button" class="q-toolbar-action" id="save-html">💾 Save</button>
           </div>
         </div>
       </header>
@@ -55,7 +64,6 @@
         {{#help}}<p class="q-help">{{help}}</p>{{/help}}
         {{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}
         <div class="q-answer-block" data-question-control></div>
-        {{#_comment_readonly}}<div class="q-reviewer-comment">{{reviewer_comment}}</div>{{/_comment_readonly}}
         <div data-review-control></div>
         <div data-reviewer-comment-control></div>
         {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}
@@ -63,16 +71,15 @@
     </template>
 
     <template id="reviewer-question-card-template">
-      <section class="q-card q-reviewer-card" data-question-id="{{id}}">
-        <div class="q-card-head">
+      <section class="q-card{{#_highlight_reviewer}} q-reviewer-card{{/_highlight_reviewer}}" data-question-id="{{id}}">
+        <div class="q-card-head q-reviewer-head">
           <h3 class="q-prompt">{{question}}</h3>
           <span class="q-meta-pill q-status-{{review_status}}">{{_status_label}}</span>
+          <div data-review-control></div>
           {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}
         </div>
         {{#analysis}}<p class="q-analysis">{{analysis}}</p>{{/analysis}}
         {{#help}}<p class="q-help">{{help}}</p>{{/help}}
-        <div class="q-answer-block" data-question-control></div>
-        <div data-review-control></div>
         <div data-reviewer-comment-control></div>
         {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}
       </section>
@@ -118,9 +125,12 @@
       </form>
     </template>
 
-    <!-- Mustache.js (required). CodeMirror is intentionally omitted: the
-         template editor falls back to a plain textarea without it. -->
     <script src="https://unpkg.com/mustache@latest/mustache.min.js"></script>
+    <script src="https://unpkg.com/codemirror@5/lib/codemirror.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/xml/xml.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/javascript/javascript.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/css/css.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/htmlmixed/htmlmixed.js"></script>
     <script src="questionnaire_v3.js"></script>
 
     <script id="questionnaire-v3-data" type="application/json"></script>
@@ -160,20 +170,17 @@
       });
       window.questionnaireV3App = app;
 
-      // Show only the role-appropriate toolbar actions; editor uses full width.
-      function syncRoleControls(role) {
-        document.querySelectorAll("[data-roles]").forEach((element) => {
-          const roles = element.getAttribute("data-roles").split(/\s+/).filter(Boolean);
-          element.hidden = roles.indexOf(role) === -1;
-        });
+      // The library handles [data-roles] visibility and is-fullwidth on every render.
+      // Only the save-html label needs manual adjustment here.
+      function updateSaveLabel() {
+        const role = app.getRole();
         document.getElementById("save-html").textContent = role === "interviewed" ? "💾 Save" : "💾 Save HTML";
-        document.querySelector(".q-shell").classList.toggle("is-fullwidth", role === "editor");
       }
-      syncRoleControls(app.getRole());
+      updateSaveLabel();
 
       document.getElementById("role-select").addEventListener("change", (e) => {
         app.setRole(e.target.value);
-        syncRoleControls(app.getRole());
+        updateSaveLabel();
       });
       document.getElementById("view-select").addEventListener("change", (e) => app.setView(e.target.value));
       document.getElementById("prev-category").addEventListener("click", () => app.previousCategory());

@@ -24,6 +24,14 @@
             <span>View</span>
             <select id="view-select"></select>
           </label>
+          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
+            <input type="checkbox" id="show-normal-checkbox" checked>
+            <span>Normal</span>
+          </label>
+          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
+            <input type="checkbox" id="show-reviewer-checkbox" checked>
+            <span>Reviewer</span>
+          </label>
           <div class="q-toolbar-actions">
             <label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV
               <input type="file" id="load-csv" accept=".csv,text/csv">
@@ -56,7 +64,6 @@
         {{#help}}<p class="q-help">{{help}}</p>{{/help}}
         {{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}
         <div class="q-answer-block" data-question-control></div>
-        {{#_comment_readonly}}<div class="q-reviewer-comment">{{reviewer_comment}}</div>{{/_comment_readonly}}
         <div data-review-control></div>
         <div data-reviewer-comment-control></div>
         {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}
@@ -121,10 +128,10 @@
 
     <script src="https://unpkg.com/mustache@latest/mustache.min.js"></script>
     <script src="https://unpkg.com/codemirror@5/lib/codemirror.js"></script>
-    <script src="https://unpkg.com/codemirror@5/mode/htmlmixed/htmlmixed.js"></script>
     <script src="https://unpkg.com/codemirror@5/mode/xml/xml.js"></script>
     <script src="https://unpkg.com/codemirror@5/mode/javascript/javascript.js"></script>
     <script src="https://unpkg.com/codemirror@5/mode/css/css.js"></script>
+    <script src="https://unpkg.com/codemirror@5/mode/htmlmixed/htmlmixed.js"></script>
     <script src="questionnaire_v3.js"></script>
 
     <script id="questionnaire-v3-data" type="application/json"></script>
@@ -148,6 +155,7 @@
       };
 
       const questions = embeddedData?.questions || [
+        // ── Basics ───────────────────────────────────────────────────────────
         {
           id: "q_full_name",
           category: "basics",
@@ -161,9 +169,10 @@
           question: "What is your employment status?",
           type: "dropdown",
           options: [
-            { value: "employed", label: "Employed" },
+            { value: "employed",      label: "Employed" },
             { value: "self_employed", label: "Self-employed" },
-            { value: "other", label: "Other", is_other: true }
+            { value: "freelance",     label: "Freelance / Contractor" },
+            { value: "other",         label: "Other", is_other: true }
           ]
         },
         {
@@ -175,6 +184,20 @@
           visible_if_value: "other"
         },
         {
+          // radio — exercises the options GUI editor
+          id: "q_project_role",
+          category: "basics",
+          question: "What is your role in the project?",
+          type: "radio",
+          options: [
+            { value: "lead",        label: "Project Lead" },
+            { value: "contributor", label: "Contributor" },
+            { value: "advisor",     label: "Advisor" },
+            { value: "other",       label: "Other", is_other: true }
+          ]
+        },
+        // ── Governance ───────────────────────────────────────────────────────
+        {
           id: "q_has_conflicts",
           category: "governance",
           question: "Does the project have any conflicts of interest?",
@@ -182,11 +205,23 @@
           help: "Answer truthfully — this drives the reviewer assessment below."
         },
         {
+          // no_or_text — text field appears when Yes is chosen
           id: "q_conflict_details",
           category: "governance",
-          question: "Are there mitigations already in place?",
+          question: "Are mitigations already in place for those conflicts?",
           type: "no_or_text",
-          help: "Choose No, or describe the mitigations."
+          help: "Choose Yes and describe the mitigations in place, or No if none exist.",
+          visible_if_id: "q_has_conflicts",
+          visible_if_value: "true"
+        },
+        {
+          // yes_or_text — text field appears when No is chosen; textarea (rows > 1)
+          id: "q_docs_complete",
+          category: "governance",
+          question: "Is all required documentation complete and submitted?",
+          type: "yes_or_text",
+          help: "Choose Yes if everything is in order, or No and describe what is still missing.",
+          rows: 3
         },
         {
           id: "q_review_conflicts",
@@ -225,16 +260,22 @@
         },
         templateOverrides: embeddedTemplates,
         onChange(event, api) {
-          // Rule: set the conflict-of-interest review status from the answer.
-          if (event.question_id === "q_has_conflicts" && event.type === "answer") {
-            const value = api.getAnswer("q_has_conflicts");
-            if (value === true) {
-              api.setReviewStatus("q_review_conflicts", "unsatisfactory", { silent: true });
-            } else if (value === false) {
-              api.setReviewStatus("q_review_conflicts", "satisfactory", { silent: true });
-            } else {
-              api.setReviewStatus("q_review_conflicts", "pending", { silent: true });
-            }
+          if (event.type !== "answer") return;
+
+          // Conflicts: no conflicts → satisfactory; conflicts present → unsatisfactory.
+          if (event.question_id === "q_has_conflicts") {
+            const v = api.getAnswer("q_has_conflicts");
+            api.setReviewStatus("q_review_conflicts",
+              v === true ? "unsatisfactory" : v === false ? "satisfactory" : "pending",
+              { silent: true });
+          }
+
+          // Docs: yes (complete) → satisfactory; no / partial text → partial.
+          if (event.question_id === "q_docs_complete") {
+            const v = api.getAnswer("q_docs_complete");
+            api.setReviewStatus("q_review_docs",
+              v === true ? "satisfactory" : v === false || v === null ? "pending" : "partial",
+              { silent: true });
           }
         }
       });
