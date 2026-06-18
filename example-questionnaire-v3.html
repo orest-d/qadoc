@@ -137,7 +137,7 @@
     <script id="questionnaire-v3-data" type="application/json"></script>
     <script id="questionnaire-v3-templates" type="application/json"></script>
 
-    <script>
+    <script id="questionnaire-v3-script">
       const dataElement = document.getElementById("questionnaire-v3-data");
       const embeddedData = dataElement && dataElement.textContent.trim()
         ? JSON.parse(dataElement.textContent)
@@ -251,7 +251,9 @@
           questions: document.getElementById("questions"),
           categoryNav: document.getElementById("category-nav"),
           editor: document.getElementById("editor"),
-          summary: document.getElementById("summary")
+          summary: document.getElementById("summary"),
+          header: document.querySelector("header.q-header"),
+          footer: document.querySelector("footer.q-footer")
         },
         templates: {
           questionCard: document.getElementById("question-card-template"),
@@ -259,25 +261,27 @@
           editorForm: document.getElementById("question-editor-template")
         },
         templateOverrides: embeddedTemplates,
-        onChange(event, api) {
-          if (event.type !== "answer") return;
-
-          // Conflicts: no conflicts → satisfactory; conflicts present → unsatisfactory.
-          if (event.question_id === "q_has_conflicts") {
-            const v = api.getAnswer("q_has_conflicts");
-            api.setReviewStatus("q_review_conflicts",
-              v === true ? "unsatisfactory" : v === false ? "satisfactory" : "pending",
-              { silent: true });
-          }
-
-          // Docs: yes (complete) → satisfactory; no / partial text → partial.
-          if (event.question_id === "q_docs_complete") {
-            const v = api.getAnswer("q_docs_complete");
-            api.setReviewStatus("q_review_docs",
-              v === true ? "satisfactory" : v === false || v === null ? "pending" : "partial",
-              { silent: true });
-          }
-        }
+        onChangeBody: [
+          '// This code runs whenever a question answer changes.',
+          '// Arguments: event (with .type, .question_id, .value) and api.',
+          'if (event.type !== "answer") return;',
+          '',
+          '// Conflicts: no conflicts → satisfactory; conflicts present → unsatisfactory.',
+          'if (event.question_id === "q_has_conflicts") {',
+          '  const v = api.getAnswer("q_has_conflicts");',
+          '  api.setReviewStatus("q_review_conflicts",',
+          '    v === true ? "unsatisfactory" : v === false ? "satisfactory" : "pending",',
+          '    { silent: true });',
+          '}',
+          '',
+          '// Docs: yes (complete) → satisfactory; no / partial text → partial.',
+          'if (event.question_id === "q_docs_complete") {',
+          '  const v = api.getAnswer("q_docs_complete");',
+          '  api.setReviewStatus("q_review_docs",',
+          '    v === true ? "satisfactory" : v === false || v === null ? "pending" : "partial",',
+          '    { silent: true });',
+          '}'
+        ].join('\n')
       });
       window.questionnaireV3App = app;
 

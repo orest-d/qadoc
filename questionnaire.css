@@ -13,6 +13,14 @@
   --q-status-unsatisfactory: #b33a30;
   --q-rule-bg: #eaf4ff;
   --q-rule-border: #b7d9f6;
+  --q-tab-html: #e0edff;
+  --q-tab-css: #fbe8d5;
+  --q-tab-js: #fef3c7;
+  --q-tab-json: #e0f2e9;
+  --q-tab-html-active: #bdd7f5;
+  --q-tab-css-active: #f5d0a9;
+  --q-tab-js-active: #fde68a;
+  --q-tab-json-active: #b6e2c8;
 }
 
 * {
@@ -971,30 +979,46 @@ select.q-review-status option { color: var(--q-ink); }
 .q-template-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 2px;
+  margin-bottom: 0;
+  border-bottom: 2px solid var(--q-border);
 }
 
 .q-template-tab {
   border: 1px solid var(--q-border);
-  border-radius: 10px;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
   background: #ffffff;
   color: var(--q-ink);
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 6px 14px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  position: relative;
+  top: 2px;
 }
 
 .q-template-tab.is-current {
-  background: var(--q-accent-soft);
+  font-weight: 600;
+  border-bottom: 2px solid #ffffff;
 }
+
+.q-template-tab--html { background: var(--q-tab-html); }
+.q-template-tab--css  { background: var(--q-tab-css); }
+.q-template-tab--js   { background: var(--q-tab-js); }
+.q-template-tab--json { background: var(--q-tab-json); }
+
+.q-template-tab--html.is-current { background: var(--q-tab-html-active); border-bottom-color: var(--q-tab-html-active); }
+.q-template-tab--css.is-current  { background: var(--q-tab-css-active); border-bottom-color: var(--q-tab-css-active); }
+.q-template-tab--js.is-current   { background: var(--q-tab-js-active); border-bottom-color: var(--q-tab-js-active); }
+.q-template-tab--json.is-current { background: var(--q-tab-json-active); border-bottom-color: var(--q-tab-json-active); }
 
 .q-template-code {
   width: 100%;
   min-height: 420px;
   border: 1px solid var(--q-border);
-  border-radius: 12px;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
   background: #ffffff;
   color: var(--q-ink);
   padding: 12px;
@@ -1005,9 +1029,19 @@ select.q-review-status option { color: var(--q-ink); }
 
 .q-template-editor .CodeMirror {
   border: 1px solid var(--q-border);
-  border-radius: 12px;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
   height: auto;
   min-height: 420px;
+}
+
+.q-template-warning {
+  background: var(--q-tab-js);
+  border: 1px solid var(--q-border);
+  border-top: none;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--q-ink);
 }
 
 /* §9 — compact reviewer card head */

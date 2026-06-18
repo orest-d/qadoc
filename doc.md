@@ -370,7 +370,16 @@ onChange(event, api) {
 
 ### Editing the Hook in the Browser
 
-Switch to editor role → template view → select **onChange** from the template selector. The hook body (the function body, without the outer `function(event, api) {…}` wrapper) is editable with JavaScript syntax highlighting. Changes apply live and are saved when you click **💾 Save HTML**.
+Switch to editor role → Source code view → select **On Change (JS)** tab. The hook body (the function body, without the outer `function(event, api) {…}` wrapper) is editable with JavaScript syntax highlighting. Changes compile and apply immediately. The hook is saved with the file when you click **💾 Save HTML**.
+
+The recommended way to provide the hook is via the `onChangeBody` config string (not the `onChange` function), so it appears in the Source code editor:
+
+```js
+const app = QuestionnaireV3.create({
+  // ...
+  onChangeBody: 'if (event.type !== "answer") return;\n// your rules here\n'
+});
+```
 
 ---
 
@@ -386,7 +395,7 @@ The URL hash reflects the current state as `#role-view` or `#role-view-id`:
 | `#reviewer-normal-governance` | Reviewer, normal view, "governance" category |
 | `#reviewer-normal-q_has_conflicts` | Reviewer, normal view, scrolled to that question |
 | `#editor-tabular` | Editor, tabular view |
-| `#editor-template-onchange` | Editor, template view, onChange tab open |
+| `#editor-template-onchange` | Editor, Source code view, On Change tab open |
 
 Share a URL with a specific hash to deep-link reviewers directly to a category or question.
 
@@ -420,16 +429,178 @@ The script renames `prompt`→`question`, `page_id`→`category`, `textarea_rows
 
 ---
 
-## Building a Self-Contained HTML File
+## Self-Contained HTML
 
-`build_questionnaire_v3.py` inlines the CSS, Mustache.js (vendored as `mustache.min.js`), and the `questionnaire_v3.js` library into a single page that works offline with no external requests. CodeMirror is intentionally **not** embedded — the template editor falls back to a plain `<textarea>` without it — so any CodeMirror `<link>`/`<script>` tags in the input are stripped.
+Clicking **💾 Save HTML** in the browser produces a fully self-contained file: all external stylesheets and scripts (including CDN resources like CodeMirror and Mustache.js) are fetched and inlined automatically. The resulting file works offline from any folder.
+
+> **Note:** When the page is opened via `file://` protocol, the browser blocks programmatic fetches of local files. In that case a warning is shown and the saved file may not be self-contained. Serve the page via a web server (e.g. `python3 -m http.server`) to guarantee full inlining.
+
+Alternatively, use the Python build script to create a self-contained file from the command line:
 
 ```bash
-# Empty, self-contained questionnaire from the bundled template
-python build_questionnaire_v3.py empty-questionnaire-v3.template.html empty-questionnaire-v3.html
-
-# Self-contained build with question data embedded from CSV/JSON/YAML
+python build_questionnaire_v3.py empty-questionnaire-v3.template.html out.html
 python build_questionnaire_v3.py empty-questionnaire-v3.template.html out.html --data questions.csv
 ```
 
-Options: `--css`, `--mustache`, `--library` override the asset paths; `--data` embeds question data into the `#questionnaire-v3-data` block. The input is any v3 HTML page that references `questionnaire.css`, a Mustache `<script src>`, and `questionnaire_v3.js` (the `empty-questionnaire-v3.template.html` and `example-questionnaire-v3.html` files both qualify).
+Options: `--css`, `--mustache`, `--library` override the asset paths; `--data` embeds question data.
+
+---
+
+## Source Code Editor
+
+The editor role provides a **Source code** view (formerly "Template") for editing all aspects of the questionnaire. Tabs are color-coded by format:
+
+| Tab | Format | Description |
+| --- | --- | --- |
+| Question Card | HTML | Mustache template for normal question cards |
+| Reviewer Card | HTML | Mustache template for review-type question cards |
+| Editor Form | HTML | Mustache template for the single-question editor panel |
+| Display Card | HTML | Mustache template for the Document view (normal questions) |
+| Display Reviewer | HTML | Mustache template for the Document view (review questions) |
+| Header | HTML | Mustache template for the page header (live preview) |
+| Footer | HTML | Mustache template for the page footer (live preview) |
+| CSS | CSS | Custom CSS overrides (applied immediately) |
+| On Change (JS) | JS | onChange hook body — compiles and applies immediately |
+| App Script (JS) | JS | Host initialization script — requires save + reload |
+| Data (JSON) | JSON | Full question data and config as live-editable JSON |
+
+---
+
+## API Reference
+
+### Factory
+
+| Method | Description |
+| --- | --- |
+| `QuestionnaireV3.create(config)` | Create and initialize a new questionnaire app instance |
+
+### Static Utilities
+
+| Name | Description |
+| --- | --- |
+| `QuestionnaireV3.parseCsv(text)` | Parse CSV text into an array of question objects |
+| `QuestionnaireV3.stringifyCsv(questions, columns)` | Serialize questions to CSV text |
+| `QuestionnaireV3.normalizeQuestion(raw, index, warnFn)` | Normalize a raw question object (fill defaults, fix types) |
+| `QuestionnaireV3.ROLES` | Array of role IDs: `["interviewed", "reviewer", "editor"]` |
+| `QuestionnaireV3.VIEWS` | Array of view IDs: `["normal", "tabular", "overview", "template", "display"]` |
+| `QuestionnaireV3.ROLE_VIEWS` | Map of role → available views |
+| `QuestionnaireV3.REVIEW_STATUSES` | Array of review status values |
+| `QuestionnaireV3.QUESTION_TYPES` | Array of supported question type strings |
+
+### Questions
+
+| Method | Description |
+| --- | --- |
+| `getQuestions()` | Return a deep clone of all questions |
+| `setQuestions(questions, options)` | Replace all questions (accepts array or `{config, questions}`) |
+| `getQuestion(id)` | Return a deep clone of a single question by ID |
+| `updateQuestion(id, patch)` | Merge a patch object into a question |
+| `updateQuestionField(id, field, value, options)` | Set a single field on a question |
+| `addQuestion(question)` | Add a new question (normalized automatically) |
+| `deleteQuestion(id)` | Remove a question by ID |
+| `moveQuestion(id, placement)` | Move a question (`placement`: `{before: id}` or `{after: id}`) |
+| `sortByCategory()` | Sort all questions by category order |
+| `indexOfQuestion(id)` | Return the index of a question, or `-1` |
+| `swapQuestion(id, direction)` | Swap a question with its neighbor (`direction`: `1` or `-1`) |
+
+### Answers
+
+| Method | Description |
+| --- | --- |
+| `getAnswer(id)` | Get the answer value for a question |
+| `setAnswer(id, value, options)` | Set the answer value (pass `{silent: true}` in hooks) |
+| `getAnswers()` | Return a `{id: value}` map of all answers |
+| `setAnswers(answers)` | Bulk-set answers from a `{id: value}` map |
+
+### Review
+
+| Method | Description |
+| --- | --- |
+| `getReviewStatus(id)` | Get the review status of a question |
+| `setReviewStatus(id, status, options)` | Set review status (`pending`, `satisfactory`, `partial`, `unsatisfactory`) |
+| `getReviewerComment(id)` | Get the reviewer comment for a question |
+| `setReviewerComment(id, value, options)` | Set the reviewer comment |
+| `getScore()` | Return `{score, maxScore, percent}` for the current category |
+| `computeScore(questions)` | Compute score for an arbitrary set of questions |
+| `recomputeScores()` | Recalculate all scores (called automatically on changes) |
+| `ragClass(score)` | Return RAG CSS class (`q-rag-green`, `q-rag-amber`, `q-rag-red`) for a score object |
+
+### Navigation
+
+| Method | Description |
+| --- | --- |
+| `getCategories()` | Return array of category names |
+| `getCurrentCategory()` | Return the current category name |
+| `setCategory(category, options)` | Navigate to a category |
+| `nextCategory()` | Navigate to the next category |
+| `previousCategory()` | Navigate to the previous category |
+| `navigateTo(target)` | Navigate to a category or question ID |
+| `navigateToQuestion(id)` | Scroll to and highlight a specific question |
+
+### Role and View
+
+| Method | Description |
+| --- | --- |
+| `getRole()` | Return the current role |
+| `setRole(role)` | Switch role (`interviewed`, `reviewer`, `editor`) |
+| `getRoleLabels()` | Return the role label map |
+| `setRoleLabels(labels)` | Override role display labels |
+| `getView()` | Return the current view |
+| `setView(view)` | Switch view (`normal`, `tabular`, `overview`, `template`, `display`) |
+| `getAvailableViews()` | Return views available for the current role |
+| `viewAvailable(view, role)` | Check if a view is available for a role |
+
+### Hash / Deep Linking
+
+| Method | Description |
+| --- | --- |
+| `getAnchor()` | Return the current anchor string |
+| `setAnchor(anchor)` | Set the anchor and navigate |
+| `applyAnchorString(anchor)` | Parse and apply an anchor string (e.g. `"editor-template-css"`) |
+| `bindHash()` | Start listening to `hashchange` events |
+| `applyHash()` | Read the current URL hash and apply it |
+| `updateHash()` | Write the current state to the URL hash |
+
+### Templates and Source Code
+
+| Method | Description |
+| --- | --- |
+| `getTemplateBody(templateId)` | Return the template/source content for a tab ID |
+| `setTemplateBody(templateId, body)` | Set template/source content (compiles immediately for JS/CSS) |
+| `getOnChangeBody()` | Return the onChange hook source string |
+| `setOnChangeBody(body)` | Set and compile the onChange hook |
+| `collectTemplateOverrides()` | Return all edited templates as a `{id: body}` map for saving |
+
+### Import / Export
+
+| Method | Description |
+| --- | --- |
+| `exportCsv()` | Export all questions as CSV text |
+| `loadCsv(csvText)` | Import questions from CSV text |
+| `exportJson(options)` | Export as JSON (`{format: "full"}` → `{config, questions}`, `"flat"` → array) |
+| `loadJson(jsonTextOrObject)` | Import questions from JSON |
+| `saveHtmlFile(filename)` | Save a self-contained HTML file (inlines all resources) |
+| `saveJsonFile(filename)` | Download questions as a JSON file |
+| `saveCsvFile(filename)` | Download questions as a CSV file |
+
+### Rendering
+
+| Method | Description |
+| --- | --- |
+| `render()` | Full re-render of all views |
+| `refreshVisibility()` | Re-evaluate visibility conditions and re-render |
+| `openEditor(id)` | Open the single-question editor panel for a question |
+| `closeEditor()` | Close the editor panel |
+
+### Validation
+
+| Method | Description |
+| --- | --- |
+| `validate()` | Check all required visible questions; returns `{id: errorMessage}` map |
+
+### Visibility
+
+| Method | Description |
+| --- | --- |
+| `isQuestionVisible(question)` | Check if a question passes its visibility condition |
+| `currentQuestions()` | Return questions visible in the current category, role, and view |
