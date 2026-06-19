@@ -1810,12 +1810,15 @@
     }
     if (question.type === "radio") {
       var hasOtherRadio = (question.options || []).some(function (o) { return o.is_other; });
-      var selectedOtherRadio = hasOtherRadio && (question.options || []).some(function (o) {
-        return o.is_other && ciEquals(value, o.value);
+      var matchesKnownRadio = (question.options || []).some(function (o) {
+        return ciEquals(value, o.value);
       });
-      var otherTextRadio = (hasOtherRadio && !selectedOtherRadio && typeof value === "string" && value !== "")
-        ? value : "";
-      var radioValue = hasOtherRadio && !selectedOtherRadio && typeof value === "string" && value !== ""
+      var isOtherTextRadio = hasOtherRadio && !matchesKnownRadio && typeof value === "string" && value !== "";
+      var selectedOtherRadio = hasOtherRadio && (matchesKnownRadio
+        ? (question.options || []).some(function (o) { return o.is_other && ciEquals(value, o.value); })
+        : isOtherTextRadio);
+      var otherTextRadio = isOtherTextRadio ? value : "";
+      var radioValue = isOtherTextRadio
         ? ((question.options || []).find(function (o) { return o.is_other; }) || {}).value || ""
         : value;
       var radioMarkup = '<fieldset class="q-fieldset">' + (question.options || []).map(function (option) {
@@ -1841,10 +1844,15 @@
     if (question.type === "dropdown") {
       var hasOtherDrop = (question.options || []).some(function (o) { return o.is_other; });
       var otherOption = hasOtherDrop ? (question.options || []).find(function (o) { return o.is_other; }) : null;
-      var selectedOtherDrop = hasOtherDrop && ciEquals(value, otherOption && otherOption.value);
-      var dropTextValue = (hasOtherDrop && !selectedOtherDrop && typeof value === "string" && value !== "")
-        ? value : "";
-      var dropValue = (hasOtherDrop && !selectedOtherDrop && typeof value === "string" && value !== "")
+      var matchesKnownDrop = (question.options || []).some(function (o) {
+        return ciEquals(value, o.value);
+      });
+      var isOtherTextDrop = hasOtherDrop && !matchesKnownDrop && typeof value === "string" && value !== "";
+      var selectedOtherDrop = hasOtherDrop && (matchesKnownDrop
+        ? ciEquals(value, otherOption && otherOption.value)
+        : isOtherTextDrop);
+      var dropTextValue = isOtherTextDrop ? value : "";
+      var dropValue = isOtherTextDrop
         ? (otherOption ? otherOption.value : "") : value;
       var dropMarkup = '<label class="q-subfield"><span class="sr-only">' + escapeHtml(question.question) +
         '</span><select data-other="' + id + '"' + disabled + '><option value=""></option>' +
@@ -1957,6 +1965,7 @@
 
   proto.bindQuestionControls = function (container) {
     var self = this;
+    var textRenderDebounce = null;
     container.querySelectorAll("[data-answer]").forEach(function (element) {
       var id = element.getAttribute("data-answer");
       var isText = element.tagName === "TEXTAREA" || element.type === "text";
@@ -1971,30 +1980,31 @@
           value = parseScalar(element.value);
         }
         self.setAnswer(id, value, { deferRender: isText });
-        if (question && (question.type === "radio" || question.type === "dropdown" || question.type === "checkbox")) {
-          self.render();
+        if (isText) {
+          if (textRenderDebounce) { W.clearTimeout(textRenderDebounce); }
+          textRenderDebounce = W.setTimeout(function () { self.render(); }, 300);
         }
       });
     });
 
     container.querySelectorAll("[data-yesno]").forEach(function (element) {
       element.addEventListener("change", function () {
-        self.handleYesNoChange(element.getAttribute("data-yesno"));
+        self.handleYesNoChange(element.getAttribute("data-yesno"), false);
       });
     });
     container.querySelectorAll("[data-yesno-text]").forEach(function (element) {
       element.addEventListener("input", function () {
-        self.handleYesNoChange(element.getAttribute("data-yesno-text"));
+        self.handleYesNoChange(element.getAttribute("data-yesno-text"), true);
       });
     });
     container.querySelectorAll("[data-other]").forEach(function (element) {
       element.addEventListener("change", function () {
-        self.handleOtherChange(element.getAttribute("data-other"));
+        self.handleOtherChange(element.getAttribute("data-other"), false);
       });
     });
     container.querySelectorAll("[data-other-text]").forEach(function (element) {
       element.addEventListener("input", function () {
-        self.handleOtherChange(element.getAttribute("data-other-text"));
+        self.handleOtherChange(element.getAttribute("data-other-text"), true);
       });
     });
     container.querySelectorAll("[data-date-today]").forEach(function (element) {
@@ -2030,7 +2040,7 @@
     });
   };
 
-  proto.handleOtherChange = function (id) {
+  proto.handleOtherChange = function (id, isTextInput) {
     var container = this.containers.questions;
     var question = this.getQuestion(id);
     if (!container || !question) { return; }
@@ -2045,7 +2055,7 @@
       isOtherSelected = !!(checkedRadio && checkedRadio.getAttribute("data-is-other"));
       if (isOtherSelected) {
         if (otherTextWrap) { otherTextWrap.hidden = false; }
-        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : null;
+        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : parseScalar(checkedRadio.value);
       } else {
         if (otherTextWrap) { otherTextWrap.hidden = true; }
         value = checkedRadio ? parseScalar(checkedRadio.value) : null;
@@ -2056,7 +2066,7 @@
       isOtherSelected = !!(selectedOption && selectedOption.getAttribute("data-is-other"));
       if (isOtherSelected) {
         if (otherTextWrap) { otherTextWrap.hidden = false; }
-        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : null;
+        value = (otherTextInput && otherTextInput.value !== "") ? otherTextInput.value : parseScalar(selectEl.value);
       } else {
         if (otherTextWrap) { otherTextWrap.hidden = true; }
         value = selectEl ? parseScalar(selectEl.value) : null;
@@ -2065,9 +2075,12 @@
       return;
     }
     this.setAnswer(id, value, { deferRender: true });
+    if (!isTextInput) {
+      this.render();
+    }
   };
 
-  proto.handleYesNoChange = function (id) {
+  proto.handleYesNoChange = function (id, isTextInput) {
     var container = this.containers.questions;
     var question = this.getQuestion(id);
     if (!container || !question) {
@@ -2107,6 +2120,9 @@
       value = choice === "yes" ? true : (choice === "no" ? false : null);
     }
     this.setAnswer(id, value, { deferRender: true });
+    if (!isTextInput) {
+      this.render();
+    }
   };
 
   function cssEscape(value) {
