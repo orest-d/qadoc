@@ -38,9 +38,12 @@
     "radio", "dropdown", "date", "info", "html", "review", "ignore"
   ];
 
+  var LIB_VERSION = "2026-06-19 17:00";
+
   var TEMPLATE_IDS = [
     "question_card", "reviewer_card", "editor_form",
     "display_card", "display_reviewer_card", "header", "footer",
+    "description",
     "css", "onchange", "script", "data"
   ];
 
@@ -53,6 +56,7 @@
     display_reviewer_card: "Display Reviewer",
     header: "Header",
     footer: "Footer",
+    description: "Description",
     css: "CSS",
     data: "Data (JSON)",
     script: "App Script (JS)"
@@ -66,6 +70,7 @@
     display_reviewer_card: "html",
     header: "html",
     footer: "html",
+    description: "html",
     css: "css",
     onchange: "js",
     data: "json",
@@ -76,8 +81,9 @@
 
   // Field groups used by the tabular editor view.
   var GROUP_QUESTION = ["id", "category", "subcategory", "question", "default", "help", "answer"];
+  var GROUP_REVIEW = ["review_status", "reviewer_comment", "weight", "weight_score"];
   var GROUP_UI = ["type", "options", "rows", "visible_if_id", "visible_if_value", "required"];
-  var GROUP_OPTIONAL = ["review_status", "reviewer_comment", "weight", "weight_score", "analysis"];
+  var GROUP_OPTIONAL = ["analysis"];
 
   // Known fields, in the order they appear in CSV/JSON exports.
   var KNOWN_FIELDS = [
@@ -106,82 +112,100 @@
     { name: "reviewer_comment", label: "Reviewer comment", ui: "textarea" }
   ];
 
-  var DEFAULT_QUESTION_CARD =
-    '<!-- Question card: rendered for each normal (non-review) question -->\n' +
-    '<section class="q-card" data-question-id="{{id}}">\n' +
-    '  <div class="q-card-head">\n' +
-    '    <h3 class="q-prompt">{{question}}</h3>\n' +
-    '    {{#required}}<span class="q-required">*</span>{{/required}}\n' +
-    '    {{#subcategory}}<span class="q-subcategory">{{subcategory}}</span>{{/subcategory}}\n' +
-    '    <!-- Edit button: only visible to editors -->\n' +
-    '    {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}\n' +
-    '  </div>\n' +
-    '  {{#help}}<p class="q-help">{{help}}</p>{{/help}}\n' +
-    '  {{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}\n' +
-    '  <!-- The library injects the answer widget here -->\n' +
-    '  <div class="q-answer-block" data-question-control></div>\n' +
-    '  <!-- Review status and reviewer comment controls (injected by the library) -->\n' +
-    '  <div data-review-control></div>\n' +
-    '  <div data-reviewer-comment-control></div>\n' +
-    '  {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}\n' +
-    '</section>';
-
-  var DEFAULT_REVIEWER_CARD =
-    '<!-- Reviewer card: rendered for review-type questions -->\n' +
-    '<section class="q-card{{#_highlight_reviewer}} q-reviewer-card{{/_highlight_reviewer}}" data-question-id="{{id}}">\n' +
-    '  <div class="q-card-head q-reviewer-head">\n' +
-    '    <h3 class="q-prompt">{{question}}</h3>\n' +
-    '    <span class="q-meta-pill q-status-{{review_status}}">{{_status_label}}</span>\n' +
-    '    <!-- Review status dropdown (injected by the library) -->\n' +
-    '    <div data-review-control></div>\n' +
-    '    {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}\n' +
-    '  </div>\n' +
-    '  {{#analysis}}<p class="q-analysis">{{analysis}}</p>{{/analysis}}\n' +
-    '  {{#help}}<p class="q-help">{{help}}</p>{{/help}}\n' +
-    '  <!-- Answer block intentionally absent for review cards -->\n' +
-    '  <div data-reviewer-comment-control></div>\n' +
-    '  {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}\n' +
-    '</section>';
-
-  var DEFAULT_DISPLAY_CARD =
-    '<!-- Display card: read-only view of a normal question -->\n' +
-    '<div class="q-display-item" data-question-id="{{id}}">\n' +
-    '  <p class="q-display-question">{{question}}</p>\n' +
-    '  {{#_answer_display}}<p class="q-display-answer">{{_answer_display}}</p>{{/_answer_display}}\n' +
-    '  {{#_has_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/_has_comment}}\n' +
-    '</div>';
-
-  var DEFAULT_DISPLAY_REVIEWER_CARD =
-    '<!-- Display reviewer card: read-only view of a review question -->\n' +
-    '<div class="q-display-reviewer-item" data-question-id="{{id}}">\n' +
-    '  <p class="q-display-question q-display-reviewer-question">{{question}}</p>\n' +
-    '  <p class="q-display-status q-status-{{review_status}}">{{_status_label}}</p>\n' +
-    '  {{#reviewer_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/reviewer_comment}}\n' +
-    '</div>';
-
-  var DEFAULT_HEADER =
-    '<!-- Header: title area and toolbar. IDs below are bound by the library automatically. -->\n' +
-    '<div>\n' +
-    '  <p class="q-kicker">Questionnaire</p>\n' +
-    '  <h1 id="questionnaire-title">{{title}}</h1>\n' +
-    '  {{#version}}<p id="questionnaire-version" class="q-subtitle">{{version}}</p>{{/version}}\n' +
-    '</div>\n' +
-    '<div class="q-toolbar">\n' +
-    '  <label><span>Role</span><select id="role-select"></select></label>\n' +
-    '  <!-- data-roles controls visibility per role -->\n' +
-    '  <label data-roles="reviewer editor"><span>View</span><select id="view-select"></select></label>\n' +
-    '  <div class="q-toolbar-actions">\n' +
-    '    <label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV<input type="file" id="load-csv" accept=".csv,text/csv"></label>\n' +
-    '    <button type="button" class="q-toolbar-action" id="save-csv" data-roles="reviewer editor">💾 Save CSV</button>\n' +
-    '    <button type="button" class="q-toolbar-action" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>\n' +
-    '    <button type="button" class="q-toolbar-action" id="save-html">💾 Save HTML</button>\n' +
-    '  </div>\n' +
-    '</div>';
-
-  var DEFAULT_FOOTER =
-    '<!-- Footer: navigation buttons. IDs are bound by the library automatically. -->\n' +
-    '<button type="button" id="prev-category">Previous</button>\n' +
-    '<button type="button" id="next-category">Next</button>';
+  // Bootstrap-only fallback templates, used when the DOM provides nothing.
+  // The HTML file is the single source of truth — these exist only so that a
+  // page created purely via the JS API (no markup at all) still works.
+  var FALLBACK_TEMPLATES = {
+    question_card:
+      '<section class="q-card" data-question-id="{{id}}">\n' +
+      '  <div class="q-card-head">\n' +
+      '    <h3 class="q-prompt">{{question}}</h3>\n' +
+      '    {{#required}}<span class="q-required">*</span>{{/required}}\n' +
+      '    {{#subcategory}}<span class="q-subcategory">{{subcategory}}</span>{{/subcategory}}\n' +
+      '    {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}\n' +
+      '  </div>\n' +
+      '  {{#help}}<p class="q-help">{{help}}</p>{{/help}}\n' +
+      '  {{#_analysis_visible}}<p class="q-analysis">{{analysis}}</p>{{/_analysis_visible}}\n' +
+      '  <div class="q-answer-block" data-question-control></div>\n' +
+      '  <div data-review-control></div>\n' +
+      '  <div data-reviewer-comment-control></div>\n' +
+      '  {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}\n' +
+      '</section>',
+    reviewer_card:
+      '<section class="q-card{{#_highlight_reviewer}} q-reviewer-card{{/_highlight_reviewer}}" data-question-id="{{id}}">\n' +
+      '  <div class="q-card-head q-reviewer-head">\n' +
+      '    <h3 class="q-prompt">{{question}}</h3>\n' +
+      '    <span class="q-meta-pill q-status-{{review_status}}">{{_status_label}}</span>\n' +
+      '    <div data-review-control></div>\n' +
+      '    {{#_editor}}<button type="button" class="q-edit-btn" data-edit-question="{{id}}">✏️ Edit</button>{{/_editor}}\n' +
+      '  </div>\n' +
+      '  {{#analysis}}<p class="q-analysis">{{analysis}}</p>{{/analysis}}\n' +
+      '  {{#help}}<p class="q-help">{{help}}</p>{{/help}}\n' +
+      '  <div data-reviewer-comment-control></div>\n' +
+      '  {{#_errors}}<p class="q-error">{{.}}</p>{{/_errors}}\n' +
+      '</section>',
+    display_card:
+      '<div class="q-display-item" data-question-id="{{id}}">\n' +
+      '  <p class="q-display-question">{{question}}</p>\n' +
+      '  {{#_answer_display}}<p class="q-display-answer">{{_answer_display}}</p>{{/_answer_display}}\n' +
+      '  {{#_has_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/_has_comment}}\n' +
+      '</div>',
+    display_reviewer_card:
+      '<div class="q-display-reviewer-item" data-question-id="{{id}}">\n' +
+      '  <p class="q-display-question q-display-reviewer-question">{{question}}</p>\n' +
+      '  <p class="q-display-status q-status-{{review_status}}">{{_status_label}}</p>\n' +
+      '  {{#reviewer_comment}}<p class="q-display-comment">{{reviewer_comment}}</p>{{/reviewer_comment}}\n' +
+      '</div>',
+    header:
+      '<nav class="q-menubar">\n' +
+      '  <div class="q-menu" data-menu="file">\n' +
+      '    <button type="button" class="q-menu-trigger">File</button>\n' +
+      '    <div class="q-menu-dropdown">\n' +
+      '      <label class="q-menu-item q-load-button">📂 Load CSV<input type="file" id="load-csv" accept=".csv,text/csv"></label>\n' +
+      '      <button type="button" class="q-menu-item" id="save-csv">💾 Save CSV</button>\n' +
+      '      <button type="button" class="q-menu-item" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>\n' +
+      '      <button type="button" class="q-menu-item" id="save-html">💾 Save HTML</button>\n' +
+      '    </div>\n' +
+      '  </div>\n' +
+      '  <div class="q-menu" data-menu="view" data-roles="reviewer editor">\n' +
+      '    <button type="button" class="q-menu-trigger">View</button>\n' +
+      '    <div class="q-menu-dropdown">\n' +
+      '      <div class="q-menu-section" id="view-menu-modes"></div>\n' +
+      '      <hr class="q-menu-separator">\n' +
+      '      <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-normal-checkbox" checked> Normal questions</label>\n' +
+      '      <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-reviewer-checkbox" checked> Reviewer questions</label>\n' +
+      '      <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-hidden-checkbox"> Show hidden</label>\n' +
+      '    </div>\n' +
+      '  </div>\n' +
+      '  <div class="q-menu" data-menu="help">\n' +
+      '    <button type="button" class="q-menu-trigger">Help</button>\n' +
+      '    <div class="q-menu-dropdown">\n' +
+      '      <button type="button" class="q-menu-item" data-help-description>📖 Description</button>\n' +
+      '      <button type="button" class="q-menu-item" data-help-about>ℹ️ About</button>\n' +
+      '    </div>\n' +
+      '  </div>\n' +
+      '  <div class="q-menubar-right">\n' +
+      '    <input type="search" id="global-search" class="q-global-search" placeholder="Search…" data-global-search>\n' +
+      '    <select id="role-select"></select>\n' +
+      '    <button type="button" class="q-menubar-save" id="save-html-shortcut">💾 Save</button>\n' +
+      '  </div>\n' +
+      '</nav>\n' +
+      '<div class="q-title-card">\n' +
+      '  <p class="q-kicker">Questionnaire</p>\n' +
+      '  <h1 id="questionnaire-title">{{title}}</h1>\n' +
+      '  {{#version}}<p id="questionnaire-version" class="q-subtitle">{{version}}</p>{{/version}}\n' +
+      '</div>',
+    footer:
+      '<button type="button" id="prev-category">Previous</button>\n' +
+      '<button type="button" id="next-category">Next</button>',
+    description:
+      '<div class="q-description">\n' +
+      '  <p>Fill in the questionnaire and click <strong>Save</strong> to download\n' +
+      '  your answers as an HTML file in your Downloads folder.</p>\n' +
+      '  <p>Your answers are stored only in the downloaded file — nothing is sent\n' +
+      '  to a server.</p>\n' +
+      '</div>'
+  };
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -659,11 +683,14 @@
     this._pendingScrollY = null;
     this.showNormalQuestions = true;
     this.showReviewerQuestions = true;
+    this.showHidden = false;
     var initVis = this._defaultVisibility();
     this.showNormalQuestions = initVis.showNormal;
     this.showReviewerQuestions = initVis.showReviewer;
 
     this.setQuestions(config.questions || [], { silent: true });
+
+    this._captureInitialTemplates();
 
     if (config.useHash !== false) {
       this.bindHash();
@@ -674,6 +701,28 @@
   }
 
   var proto = QuestionnaireV3App.prototype;
+
+  // Snapshot initial template content from the DOM before the first render()
+  // overwrites it.  This makes the HTML file the single source of truth —
+  // the JS FALLBACK_TEMPLATES are only used when the DOM provides nothing.
+  proto._captureInitialTemplates = function () {
+    this._initialTemplates = {};
+    // Card templates from <template> elements
+    var qc = getTemplateHtml(this.templates.questionCard);
+    if (qc) { this._initialTemplates.question_card = qc; }
+    var rc = getTemplateHtml(this.templates.reviewerQuestionCard);
+    if (rc) { this._initialTemplates.reviewer_card = rc; }
+    var ef = getTemplateHtml(this.templates.editorForm);
+    if (ef) { this._initialTemplates.editor_form = ef; }
+    // Header/footer from live container innerHTML (captured before renderHeader
+    // replaces it).
+    if (this.containers.header && this.containers.header.innerHTML.trim()) {
+      this._initialTemplates.header = this.containers.header.innerHTML;
+    }
+    if (this.containers.footer && this.containers.footer.innerHTML.trim()) {
+      this._initialTemplates.footer = this.containers.footer.innerHTML;
+    }
+  };
 
   proto.api = function () {
     return this;
@@ -772,6 +821,24 @@
     var self = this;
     var question = this.getQuestion(id);
     if (!question) {
+      return;
+    }
+    if (field === "id") {
+      value = String(value || "").trim();
+      if (!value || value.indexOf("-") !== -1) { return; }
+      var duplicate = this.questions.some(function (q) {
+        return q !== question && q.id === value;
+      });
+      if (duplicate) { return; }
+      var oldId = question.id;
+      question.id = value;
+      this.questions.forEach(function (q) {
+        if (q.visible_if_id === oldId) { q.visible_if_id = value; }
+      });
+      if (this.editingId === oldId) { this.editingId = value; }
+      this.recomputeScores();
+      this.triggerChange({ type: "question", question_id: value, field: field, value: value }, options);
+      if (!options || !options.deferRender) { this.render(); }
       return;
     }
     if (field === "category") {
@@ -1302,7 +1369,7 @@
   // showReviewerQuestions flags (reviewer & editor only).
   proto.passesRoleView = function (question) {
     if (question.type === "ignore") {
-      return false;
+      return this.showHidden;
     }
     if (question.type === "review") {
       if (this.role === "interviewed") {
@@ -1342,7 +1409,10 @@
     if (!this.passesRoleView(question)) {
       return false;
     }
-    return this.isExpressionVisible(question, []);
+    if (!this.isExpressionVisible(question, [])) {
+      return this.showHidden;
+    }
+    return true;
   };
 
   proto.evaluateExpression = function (expression, value, refQuestion) {
@@ -1459,6 +1529,20 @@
       }).join("");
       viewSelect.value = this.view;
     }
+    var viewModes = doc.getElementById("view-menu-modes");
+    if (viewModes) {
+      viewModes.innerHTML = this.getAvailableViews().map(function (view) {
+        var active = view === self.view ? " is-active" : "";
+        return '<button type="button" class="q-menu-item q-view-mode-btn' + active +
+          '" data-view-mode="' + escapeHtml(view) + '">' +
+          escapeHtml(self.viewLabels[view]) + "</button>";
+      }).join("");
+      viewModes.querySelectorAll("[data-view-mode]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          self.setView(btn.getAttribute("data-view-mode"));
+        });
+      });
+    }
     // Visibility checkboxes — only shown in reviewer/editor roles.
     var normalCb = doc.getElementById("show-normal-checkbox");
     if (normalCb) {
@@ -1478,6 +1562,17 @@
         reviewerCb._qBound = true;
         reviewerCb.addEventListener("change", function () {
           self.showReviewerQuestions = reviewerCb.checked;
+          self.render();
+        });
+      }
+    }
+    var hiddenCb = doc.getElementById("show-hidden-checkbox");
+    if (hiddenCb) {
+      hiddenCb.checked = this.showHidden;
+      if (!hiddenCb._qBound) {
+        hiddenCb._qBound = true;
+        hiddenCb.addEventListener("change", function () {
+          self.showHidden = hiddenCb.checked;
           self.render();
         });
       }
@@ -1568,9 +1663,15 @@
         if (question.category !== cat) { return; }
         if (!self.passesRoleView(question)) { return; }
         if (!self.isQuestionVisible(question)) { return; }
+        if (!self.editorQuestionMatchesSearch(question, self.editorSearch)) { return; }
         var ctx = self.questionContext(question);
         var tpl = question.type === "review" ? displayReviewerTpl : displayCardTpl;
-        html += W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+        var rendered = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+        if (ctx._hidden_revealed) {
+          html += '<div class="q-display-hidden">' + rendered + '</div>';
+        } else {
+          html += rendered;
+        }
       });
     });
     html += "</div>";
@@ -1581,16 +1682,28 @@
   proto.renderHeader = function () {
     var container = this.containers.header;
     if (!container) { return; }
+    var doc = W.document;
+    var hadSearchFocus = doc && doc.activeElement &&
+      doc.activeElement.getAttribute && doc.activeElement.getAttribute("data-global-search") !== null;
     var tpl = this.getTemplateBody("header");
     var ctx = {
       title: this.config.title || "",
       version: this.config.version || "",
       id: this.config.id || "",
       _role: this.role,
-      _view: this.view
+      _view: this.view,
+      _lib_version: LIB_VERSION
     };
     container.innerHTML = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
     this.bindHeader(container);
+    var searchEl = container.querySelector("[data-global-search]");
+    if (searchEl) {
+      searchEl.value = this.editorSearch || "";
+      if (hadSearchFocus) {
+        searchEl.focus();
+        searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length);
+      }
+    }
   };
 
   proto.renderFooter = function () {
@@ -1607,7 +1720,8 @@
       version: this.config.version || "",
       id: this.config.id || "",
       _role: this.role,
-      _view: this.view
+      _view: this.view,
+      _lib_version: LIB_VERSION
     };
     container.innerHTML = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
     this.bindHeader(container);
@@ -1668,6 +1782,57 @@
         file.text().then(function (text) { self.loadCsv(text); });
       });
     }
+    // Save shortcut
+    var saveShortcut = container.querySelector("#save-html-shortcut");
+    if (saveShortcut && !saveShortcut._qBound) {
+      saveShortcut._qBound = true;
+      saveShortcut.addEventListener("click", function () { self.saveHtmlFile(); });
+    }
+    // Menu open/close
+    container.querySelectorAll(".q-menu-trigger").forEach(function (trigger) {
+      if (trigger._qBound) { return; }
+      trigger._qBound = true;
+      trigger.addEventListener("click", function (e) {
+        var menu = trigger.closest(".q-menu");
+        var wasOpen = menu.classList.contains("is-open");
+        container.querySelectorAll(".q-menu.is-open").forEach(function (m) {
+          m.classList.remove("is-open");
+        });
+        if (!wasOpen) { menu.classList.add("is-open"); }
+        e.stopPropagation();
+      });
+    });
+    if (!container._qMenuClose) {
+      container._qMenuClose = true;
+      doc.addEventListener("click", function () {
+        container.querySelectorAll(".q-menu.is-open").forEach(function (m) {
+          m.classList.remove("is-open");
+        });
+      });
+    }
+    // Help dialogs
+    var descBtn = container.querySelector("[data-help-description]");
+    if (descBtn && !descBtn._qBound) {
+      descBtn._qBound = true;
+      descBtn.addEventListener("click", function () { self.showDescriptionDialog(); });
+    }
+    var aboutBtn = container.querySelector("[data-help-about]");
+    if (aboutBtn && !aboutBtn._qBound) {
+      aboutBtn._qBound = true;
+      aboutBtn.addEventListener("click", function () { self.showAboutDialog(); });
+    }
+    // Global search
+    var globalSearch = container.querySelector("[data-global-search]");
+    if (globalSearch) {
+      globalSearch.value = self.editorSearch || "";
+      if (!globalSearch._qBound) {
+        globalSearch._qBound = true;
+        globalSearch.addEventListener("input", function () {
+          self.editorSearch = globalSearch.value;
+          self.render();
+        });
+      }
+    }
     this.syncHeaderControls();
     this.syncSelects();
   };
@@ -1686,7 +1851,8 @@
     }
     var self = this;
     var visible = this.currentQuestions().filter(function (question) {
-      return self.isQuestionVisible(question);
+      return self.isQuestionVisible(question) &&
+        self.editorQuestionMatchesSearch(question, self.editorSearch);
     });
     if (!visible.length) {
       container.innerHTML = '<p class="q-empty">No questions to display.</p>';
@@ -1701,13 +1867,10 @@
   proto.pickCardTemplate = function (question) {
     var isReviewCard = question.type === "review" && (this.role === "reviewer" || this.role === "editor");
     if (isReviewCard) {
-      var reviewerTemplate = this.templateOverrides.reviewer_card || getTemplateHtml(this.templates.reviewerQuestionCard);
-      if (reviewerTemplate) {
-        return reviewerTemplate;
-      }
-      return this.templateOverrides.question_card || getTemplateHtml(this.templates.questionCard) || DEFAULT_REVIEWER_CARD;
+      var reviewerTemplate = this.getTemplateBody("reviewer_card");
+      return reviewerTemplate || this.getTemplateBody("question_card");
     }
-    return this.templateOverrides.question_card || getTemplateHtml(this.templates.questionCard) || DEFAULT_QUESTION_CARD;
+    return this.getTemplateBody("question_card");
   };
 
   function answerDisplay(value) {
@@ -1737,6 +1900,9 @@
     context._errors = errors ? [errors] : [];
     var rag = this.ragClass(null);
     context._rag = rag;
+    context._lib_version = LIB_VERSION;
+    var wouldBeHidden = question.type === "ignore" || !this.isExpressionVisible(question, []);
+    context._hidden_revealed = wouldBeHidden && this.showHidden;
     return context;
   };
 
@@ -1763,6 +1929,10 @@
     var comment = node.querySelector("[data-reviewer-comment-control]");
     if (comment) {
       comment.innerHTML = this.renderCommentControl(question);
+    }
+    var wouldBeHidden = question.type === "ignore" || !this.isExpressionVisible(question, []);
+    if (wouldBeHidden && this.showHidden) {
+      node.classList.add("q-hidden-revealed");
     }
     return node.outerHTML;
   };
@@ -2383,6 +2553,7 @@
 
   proto.bindEditorForm = function (container, id) {
     var self = this;
+    var ref = { id: id };
     var panel = container.querySelector(".q-editor-panel");
     if (!panel) {
       return;
@@ -2398,10 +2569,11 @@
       input.addEventListener(isImmediate ? "change" : "input", function () {
         var field = input.getAttribute("data-editor-field");
         var value = input.type === "checkbox" ? input.checked : input.value;
-        self.updateQuestionField(id, field, value, { deferRender: !isImmediate && field !== "id" });
+        self.updateQuestionField(ref.id, field, value, { deferRender: !isImmediate && field !== "id" });
+        if (field === "id") { ref.id = value; }
       });
     });
-    this.bindOptionsEditor(panel, id);
+    this.bindOptionsEditor(panel, ref.id);
   };
 
   // --- tabular view ---------------------------------------------------------
@@ -2421,6 +2593,7 @@
     });
     return {
       question: GROUP_QUESTION.slice(),
+      review: GROUP_REVIEW.slice(),
       ui: GROUP_UI.slice(),
       optional: GROUP_OPTIONAL.concat(extra)
     };
@@ -2431,7 +2604,7 @@
     if (!needle) {
       return true;
     }
-    return [question.id, question.question, question.answer].some(function (value) {
+    return [question.id, question.question, question.answer, question.reviewer_comment].some(function (value) {
       return displayValue(value).toLowerCase().indexOf(needle) !== -1;
     });
   };
@@ -2443,7 +2616,7 @@
     }
     var self = this;
     var groups = this.tabularColumns();
-    var allColumns = groups.question.concat(groups.ui, groups.optional);
+    var allColumns = groups.question.concat(groups.review, groups.ui, groups.optional);
     var search = this.editorSearch || "";
     var rows = this.questions.filter(function (question) {
       return self.editorQuestionMatchesSearch(question, search);
@@ -2455,12 +2628,14 @@
     var groupHeader = '<tr class="q-tabular-groups">' +
       '<th class="q-tabular-controls-head"></th>' +
       '<th class="q-tabular-group-question" colspan="' + groups.question.length + '">Question</th>' +
+      '<th class="q-tabular-group-review" colspan="' + groups.review.length + '">Review</th>' +
       '<th class="q-tabular-group-ui" colspan="' + groups.ui.length + '">UI</th>' +
       '<th class="q-tabular-group-optional" colspan="' + groups.optional.length + '">Optional</th>' +
       "</tr>";
     var columnHeader = '<tr class="q-tabular-columns"><th class="q-tabular-controls-head">Actions</th>' +
       allColumns.map(function (column) {
         var groupClass = groups.question.indexOf(column) !== -1 ? "q-tabular-group-question"
+          : groups.review.indexOf(column) !== -1 ? "q-tabular-group-review"
           : groups.ui.indexOf(column) !== -1 ? "q-tabular-group-ui" : "q-tabular-group-optional";
         return '<th class="' + groupClass + '">' + escapeHtml(column) + "</th>";
       }).join("") + "</tr>";
@@ -2470,9 +2645,7 @@
     }).join("");
 
     container.innerHTML = '<div class="q-tabular">' +
-      '<div class="q-tabular-toolbar"><label class="q-editor-search"><span>🔍 Search</span>' +
-      '<input type="search" data-tabular-search value="' + escapeHtml(search) +
-      '" placeholder="ID, question, or answer"></label>' + addButton + "</div>" +
+      (addButton ? '<div class="q-tabular-toolbar">' + addButton + "</div>" : "") +
       '<table class="q-tabular-table"><thead>' + groupHeader + columnHeader +
       "</thead><tbody>" + body + "</tbody></table></div>";
 
@@ -2494,6 +2667,7 @@
     var controls = '<td class="q-tabular-controls">' + dragHandle + normalLink + upBtn + downBtn + editBtn + deleteBtn + "</td>";
     var cells = columns.map(function (column) {
       var groupClass = groups.question.indexOf(column) !== -1 ? "q-tabular-group-question"
+        : groups.review.indexOf(column) !== -1 ? "q-tabular-group-review"
         : groups.ui.indexOf(column) !== -1 ? "q-tabular-group-ui" : "q-tabular-group-optional";
       return '<td class="' + groupClass + '">' + self.renderTabularCell(question, column) + "</td>";
     }).join("");
@@ -2546,18 +2720,6 @@
 
   proto.bindTabular = function (container) {
     var self = this;
-    var searchInput = container.querySelector("[data-tabular-search]");
-    if (searchInput) {
-      searchInput.addEventListener("input", function () {
-        self.editorSearch = searchInput.value;
-        self.renderTabular();
-        var next = self.containers.editor.querySelector("[data-tabular-search]");
-        if (next) {
-          next.focus();
-          next.setSelectionRange(next.value.length, next.value.length);
-        }
-      });
-    }
     var add = container.querySelector("[data-tabular-add]");
     if (add) {
       add.addEventListener("click", function () {
@@ -2572,6 +2734,28 @@
         var qid = input.getAttribute("data-tabular-id");
         var value = input.type === "checkbox" ? input.checked : input.value;
         self.updateQuestionField(qid, field, value, { deferRender: !isImmediate });
+        if (field === "id" && !isImmediate) {
+          var newId = value;
+          var row = input.closest("[data-tabular-row]");
+          if (row) {
+            row.setAttribute("data-tabular-row", newId);
+            row.querySelectorAll("[data-tabular-id]").forEach(function (el) {
+              el.setAttribute("data-tabular-id", newId);
+            });
+            row.querySelectorAll("[data-tabular-edit]").forEach(function (el) {
+              el.setAttribute("data-tabular-edit", newId);
+            });
+            row.querySelectorAll("[data-tabular-delete]").forEach(function (el) {
+              el.setAttribute("data-tabular-delete", newId);
+            });
+            row.querySelectorAll("[data-tabular-up]").forEach(function (el) {
+              el.setAttribute("data-tabular-up", newId);
+            });
+            row.querySelectorAll("[data-tabular-down]").forEach(function (el) {
+              el.setAttribute("data-tabular-down", newId);
+            });
+          }
+        }
       });
     });
     container.querySelectorAll("[data-tabular-up]").forEach(function (button) {
@@ -2658,33 +2842,14 @@
 
   // --- template view --------------------------------------------------------
 
+  // Resolution chain: templateOverrides → _initialTemplates → FALLBACK_TEMPLATES.
+  // Computed templates (css, data, script, onchange) are handled separately.
   proto.getTemplateBody = function (templateId) {
     if (Object.prototype.hasOwnProperty.call(this.templateOverrides, templateId)) {
       return this.templateOverrides[templateId];
     }
     if (templateId === "onchange") {
       return this.onChangeBody || "";
-    }
-    if (templateId === "question_card") {
-      return getTemplateHtml(this.templates.questionCard) || DEFAULT_QUESTION_CARD;
-    }
-    if (templateId === "reviewer_card") {
-      return getTemplateHtml(this.templates.reviewerQuestionCard) || DEFAULT_REVIEWER_CARD;
-    }
-    if (templateId === "editor_form") {
-      return getTemplateHtml(this.templates.editorForm) || "";
-    }
-    if (templateId === "display_card") {
-      return DEFAULT_DISPLAY_CARD;
-    }
-    if (templateId === "display_reviewer_card") {
-      return DEFAULT_DISPLAY_REVIEWER_CARD;
-    }
-    if (templateId === "header") {
-      return getTemplateHtml(this.templates.header) || DEFAULT_HEADER;
-    }
-    if (templateId === "footer") {
-      return getTemplateHtml(this.templates.footer) || DEFAULT_FOOTER;
     }
     if (templateId === "css") {
       return this._collectInlineCss();
@@ -2696,7 +2861,9 @@
       var scriptEl = W.document && W.document.getElementById("questionnaire-v3-script");
       return scriptEl ? scriptEl.textContent : "";
     }
-    return "";
+    var initial = this._initialTemplates && this._initialTemplates[templateId];
+    if (initial) { return initial; }
+    return FALLBACK_TEMPLATES[templateId] || "";
   };
 
   proto._collectInlineCss = function () {
@@ -3063,6 +3230,47 @@
     this.render();
   };
 
+  // --- modal dialogs -------------------------------------------------------
+
+  proto._showModal = function (title, contentHtml) {
+    var doc = W.document;
+    var existing = doc.querySelector(".q-modal-overlay");
+    if (existing) { existing.remove(); }
+    var overlay = doc.createElement("div");
+    overlay.className = "q-modal-overlay";
+    overlay.innerHTML =
+      '<div class="q-modal">' +
+      '<div class="q-modal-head"><h2>' + escapeHtml(title) +
+      '</h2><button type="button" class="q-modal-close">&times;</button></div>' +
+      '<div class="q-modal-body">' + contentHtml + '</div></div>';
+    doc.body.appendChild(overlay);
+    overlay.querySelector(".q-modal-close").addEventListener("click", function () {
+      overlay.remove();
+    });
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) { overlay.remove(); }
+    });
+  };
+
+  proto.showDescriptionDialog = function () {
+    var body = this.getTemplateBody("description");
+    var html = W.Mustache ? W.Mustache.render(body, {
+      title: this.config.title || "",
+      version: this.config.version || "",
+      _lib_version: LIB_VERSION
+    }) : body;
+    this._showModal("Description", html);
+  };
+
+  proto.showAboutDialog = function () {
+    var html = '<div class="q-about">' +
+      '<p><strong>' + escapeHtml(this.config.title || "Questionnaire") + '</strong></p>' +
+      (this.config.version ? '<p>Version: ' + escapeHtml(this.config.version) + '</p>' : '') +
+      '<p>Library: ' + escapeHtml(LIB_VERSION) + '</p>' +
+      '</div>';
+    this._showModal("About", html);
+  };
+
   proto.validate = function () {
     var self = this;
     var errors = {};
@@ -3084,6 +3292,7 @@
   // ---------------------------------------------------------------------------
 
   var QuestionnaireV3 = {
+    VERSION: LIB_VERSION,
     create: function (config) {
       return new QuestionnaireV3App(config || {});
     },

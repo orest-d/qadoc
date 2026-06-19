@@ -10,36 +10,43 @@
   <body>
     <div class="q-shell">
       <header class="q-header">
-        <div>
+        <nav class="q-menubar">
+          <div class="q-menu" data-menu="file">
+            <button type="button" class="q-menu-trigger">File</button>
+            <div class="q-menu-dropdown">
+              <label class="q-menu-item q-load-button">📂 Load CSV<input type="file" id="load-csv" accept=".csv,text/csv"></label>
+              <button type="button" class="q-menu-item" id="save-csv">💾 Save CSV</button>
+              <button type="button" class="q-menu-item" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>
+              <button type="button" class="q-menu-item" id="save-html">💾 Save HTML</button>
+            </div>
+          </div>
+          <div class="q-menu" data-menu="view" data-roles="reviewer editor">
+            <button type="button" class="q-menu-trigger">View</button>
+            <div class="q-menu-dropdown">
+              <div class="q-menu-section" id="view-menu-modes"></div>
+              <hr class="q-menu-separator">
+              <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-normal-checkbox" checked> Normal questions</label>
+              <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-reviewer-checkbox" checked> Reviewer questions</label>
+              <label class="q-menu-item q-menu-checkbox"><input type="checkbox" id="show-hidden-checkbox"> Show hidden</label>
+            </div>
+          </div>
+          <div class="q-menu" data-menu="help">
+            <button type="button" class="q-menu-trigger">Help</button>
+            <div class="q-menu-dropdown">
+              <button type="button" class="q-menu-item" data-help-description>📖 Description</button>
+              <button type="button" class="q-menu-item" data-help-about>ℹ️ About</button>
+            </div>
+          </div>
+          <div class="q-menubar-right">
+            <input type="search" id="global-search" class="q-global-search" placeholder="Search…" data-global-search>
+            <select id="role-select"></select>
+            <button type="button" class="q-menubar-save" id="save-html-shortcut">💾 Save</button>
+          </div>
+        </nav>
+        <div class="q-title-card">
           <p class="q-kicker">Questionnaire</p>
           <h1 id="questionnaire-title">Questionnaire</h1>
           <p id="questionnaire-version" class="q-subtitle">Version 3.0</p>
-        </div>
-        <div class="q-toolbar">
-          <label>
-            <span>Role</span>
-            <select id="role-select"></select>
-          </label>
-          <label data-roles="reviewer editor">
-            <span>View</span>
-            <select id="view-select"></select>
-          </label>
-          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
-            <input type="checkbox" id="show-normal-checkbox" checked>
-            <span>Normal</span>
-          </label>
-          <label class="q-toolbar-checkbox" data-roles="reviewer editor">
-            <input type="checkbox" id="show-reviewer-checkbox" checked>
-            <span>Reviewer</span>
-          </label>
-          <div class="q-toolbar-actions">
-            <label class="q-load-button q-toolbar-action" data-roles="reviewer editor">📂 Load CSV
-              <input type="file" id="load-csv" accept=".csv,text/csv">
-            </label>
-            <button type="button" class="q-toolbar-action" id="save-csv" data-roles="reviewer editor">💾 Save CSV</button>
-            <button type="button" class="q-toolbar-action" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>
-            <button type="button" class="q-toolbar-action" id="save-html">💾 Save</button>
-          </div>
         </div>
       </header>
 
@@ -169,30 +176,6 @@
         onChangeBody: '// Add questionnaire-specific rules here.\n'
       });
       window.questionnaireV3App = app;
-
-      // The library handles [data-roles] visibility and is-fullwidth on every render.
-      // Only the save-html label needs manual adjustment here.
-      function updateSaveLabel() {
-        const role = app.getRole();
-        document.getElementById("save-html").textContent = role === "interviewed" ? "💾 Save" : "💾 Save HTML";
-      }
-      updateSaveLabel();
-
-      document.getElementById("role-select").addEventListener("change", (e) => {
-        app.setRole(e.target.value);
-        updateSaveLabel();
-      });
-      document.getElementById("view-select").addEventListener("change", (e) => app.setView(e.target.value));
-      document.getElementById("prev-category").addEventListener("click", () => app.previousCategory());
-      document.getElementById("next-category").addEventListener("click", () => app.nextCategory());
-      document.getElementById("save-csv").addEventListener("click", () => app.saveCsvFile("questions.csv"));
-      document.getElementById("save-json").addEventListener("click", () => app.saveJsonFile("questionnaire.json"));
-      document.getElementById("save-html").addEventListener("click", () => app.saveHtmlFile("questionnaire.html"));
-      document.getElementById("load-csv").addEventListener("change", (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        file.text().then((text) => app.loadCsv(text));
-      });
     </script>
   </body>
 </html>

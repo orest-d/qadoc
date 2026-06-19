@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Visibility Expression Tests</title>
+  <style>
+    body { font-family: monospace; margin: 20px; }
+    .pass { color: green; }
+    .fail { color: red; font-weight: bold; }
+    .section { margin-top: 16px; font-weight: bold; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <h1>Visibility Expression Unit Tests</h1>
+  <div id="results"></div>
+
+  <div id="questions" style="display:none;"></div>
+  <nav id="category-nav" style="display:none;"></nav>
+  <section id="editor" style="display:none;"></section>
+  <div id="summary" style="display:none;"></div>
+
+  <script src="questionnaire_v3.js"></script>
+  <script>
+    var results = document.getElementById("results");
+    var passed = 0;
+    var failed = 0;
+
+    function section(title) {
+      var div = document.createElement("div");
+      div.className = "section";
+      div.textContent = title;
+      results.appendChild(div);
+    }
+
+    function assert(description, actual, expected) {
+      var ok = actual === expected;
+      var div = document.createElement("div");
+      div.className = ok ? "pass" : "fail";
+      div.textContent = (ok ? "PASS" : "FAIL") + ": " + description +
+        (ok ? "" : " (expected " + JSON.stringify(expected) + ", got " + JSON.stringify(actual) + ")");
+      results.appendChild(div);
+      if (ok) passed++; else failed++;
+    }
+
+    function makeApp(questions, role) {
+      return QuestionnaireV3.create({
+        config: { id: "test", title: "Test" },
+        questions: questions,
+        role: role || "interviewed",
+        containers: {
+          questions: document.getElementById("questions"),
+          categoryNav: document.getElementById("category-nav"),
+          editor: document.getElementById("editor"),
+          summary: document.getElementById("summary")
+        }
+      });
+    }
+
+    // =========================================================================
+    section("Basic visibility: no condition");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Always visible", type: "text" }
+      ]);
+      assert("Question with no visible_if_id is visible",
+        app.isQuestionVisible(app.getQuestion("q1")), true);
+    })();
+
+    // =========================================================================
+    section("Visibility: depends on truthy value");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Trigger", type: "yes_or_no" },
+        { id: "q2", question: "Dependent", type: "text", visible_if_id: "q1", visible_if_value: "true" }
+      ]);
+      assert("Dependent hidden when trigger unanswered",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", true, { silent: true });
+      assert("Dependent visible when trigger is true",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", false, { silent: true });
+      assert("Dependent hidden when trigger is false",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+    })();
+
+    // =========================================================================
+    section("Visibility: depends on false value");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Trigger", type: "yes_or_no" },
+        { id: "q2", question: "Dependent", type: "text", visible_if_id: "q1", visible_if_value: "false" }
+      ]);
+      assert("Dependent hidden when trigger unanswered (expects false)",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", false, { silent: true });
+      assert("Dependent visible when trigger is false",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", true, { silent: true });
+      assert("Dependent hidden when trigger is true",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+    })();
+
+    // =========================================================================
+    section("Visibility: depends on specific string value");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Country", type: "dropdown", options: [
+          { value: "us", label: "US" }, { value: "uk", label: "UK" }, { value: "other", label: "Other", is_other: true }
+        ]},
+        { id: "q2", question: "State", type: "text", visible_if_id: "q1", visible_if_value: "us" }
+      ]);
+      assert("Hidden when trigger unanswered",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "us", { silent: true });
+      assert("Visible when trigger matches 'us'",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "uk", { silent: true });
+      assert("Hidden when trigger is 'uk'",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "US", { silent: true });
+      assert("Visible with case-insensitive match 'US'",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+    })();
+
+    // =========================================================================
+    section("Visibility: OR expression (pipe-separated)");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Country", type: "text" },
+        { id: "q2", question: "EU details", type: "text", visible_if_id: "q1", visible_if_value: "de|fr|it" }
+      ]);
+      app.setAnswer("q1", "de", { silent: true });
+      assert("Visible when value matches first OR token",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "fr", { silent: true });
+      assert("Visible when value matches second OR token",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "us", { silent: true });
+      assert("Hidden when value matches no OR token",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+    })();
+
+    // =========================================================================
+    section("Visibility: negation (! prefix)");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Skip?", type: "yes_or_no" },
+        { id: "q2", question: "Details", type: "text", visible_if_id: "q1", visible_if_value: "!true" }
+      ]);
+      app.setAnswer("q1", true, { silent: true });
+      assert("Hidden when negated condition matches",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", false, { silent: true });
+      assert("Visible when negated condition does not match",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+    })();
+
+    // =========================================================================
+    section("Visibility: 'other' token (is_other option)");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Role", type: "radio", options: [
+          { value: "dev", label: "Developer" }, { value: "other", label: "Other", is_other: true }
+        ]},
+        { id: "q2", question: "Describe role", type: "text", visible_if_id: "q1", visible_if_value: "other" }
+      ]);
+      assert("Hidden when unanswered",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "dev", { silent: true });
+      assert("Hidden when known option selected",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "other", { silent: true });
+      assert("Visible when 'other' selected",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "custom text", { silent: true });
+      assert("Visible when free text (not a known option)",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+    })();
+
+    // =========================================================================
+    section("Visibility: empty expression (any truthy value)");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Name", type: "text" },
+        { id: "q2", question: "Greeting", type: "text", visible_if_id: "q1" }
+      ]);
+      assert("Hidden when trigger is empty string",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "Alice", { silent: true });
+      assert("Visible when trigger has any truthy value",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "", { silent: true });
+      assert("Hidden again when trigger cleared",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+    })();
+
+    // =========================================================================
+    section("Visibility: default value fallback");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Has default", type: "text", default: "yes" },
+        { id: "q2", question: "Dependent", type: "text", visible_if_id: "q1", visible_if_value: "yes" }
+      ]);
+      assert("Visible via default value when unanswered",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+
+      app.setAnswer("q1", "no", { silent: true });
+      assert("Hidden when answer overrides default",
+        app.isQuestionVisible(app.getQuestion("q2")), false);
+
+      app.setAnswer("q1", "", { silent: true });
+      assert("Visible again when answer cleared (falls back to default)",
+        app.isQuestionVisible(app.getQuestion("q2")), true);
+    })();
+
+    // =========================================================================
+    section("Chained visibility: A → B → C");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "a", question: "A", type: "yes_or_no" },
+        { id: "b", question: "B", type: "yes_or_no", visible_if_id: "a", visible_if_value: "true" },
+        { id: "c", question: "C", type: "text", visible_if_id: "b", visible_if_value: "true" }
+      ]);
+      assert("C hidden when A unanswered (B not visible, B has no default)",
+        app.isQuestionVisible(app.getQuestion("c")), false);
+
+      app.setAnswer("a", true, { silent: true });
+      assert("B visible when A=true",
+        app.isQuestionVisible(app.getQuestion("b")), true);
+      assert("C still hidden (B visible but unanswered)",
+        app.isQuestionVisible(app.getQuestion("c")), false);
+
+      app.setAnswer("b", true, { silent: true });
+      assert("C visible when A=true and B=true",
+        app.isQuestionVisible(app.getQuestion("c")), true);
+
+      app.setAnswer("a", false, { silent: true });
+      assert("B hidden when A=false",
+        app.isQuestionVisible(app.getQuestion("b")), false);
+      assert("C hidden when B becomes not visible (even though B answer is still true)",
+        app.isQuestionVisible(app.getQuestion("c")), false);
+    })();
+
+    // =========================================================================
+    section("Chained visibility: hidden ref uses default");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "a", question: "A", type: "yes_or_no" },
+        { id: "b", question: "B", type: "yes_or_no", visible_if_id: "a", visible_if_value: "true", default: true },
+        { id: "c", question: "C", type: "text", visible_if_id: "b", visible_if_value: "true" }
+      ]);
+      assert("C visible via B's default even when A is unanswered (B not visible)",
+        app.isQuestionVisible(app.getQuestion("c")), true);
+
+      app.setAnswer("a", true, { silent: true });
+      app.setAnswer("b", false, { silent: true });
+      assert("C hidden when B is visible and B=false",
+        app.isQuestionVisible(app.getQuestion("c")), false);
+
+      app.setAnswer("a", false, { silent: true });
+      assert("C visible again: B hidden → falls back to B's default (true)",
+        app.isQuestionVisible(app.getQuestion("c")), true);
+    })();
+
+    // =========================================================================
+    section("Visibility after setAnswer triggers re-render");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Trigger", type: "yes_or_no" },
+        { id: "q2", question: "Dependent", type: "text", visible_if_id: "q1", visible_if_value: "true" }
+      ]);
+      var container = document.getElementById("questions");
+
+      app.setAnswer("q1", true);
+      var q2Card = container.querySelector('[data-question-id="q2"]');
+      assert("Dependent card rendered after trigger set to true",
+        q2Card !== null, true);
+
+      app.setAnswer("q1", false);
+      q2Card = container.querySelector('[data-question-id="q2"]');
+      assert("Dependent card removed after trigger set to false",
+        q2Card, null);
+    })();
+
+    // =========================================================================
+    section("Chained visibility: DOM reflects chain changes");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "a", question: "A", type: "yes_or_no" },
+        { id: "b", question: "B", type: "yes_or_no", visible_if_id: "a", visible_if_value: "true" },
+        { id: "c", question: "C", type: "text", visible_if_id: "b", visible_if_value: "true" }
+      ]);
+      var container = document.getElementById("questions");
+
+      app.setAnswer("a", true);
+      app.setAnswer("b", true);
+      assert("C card rendered when full chain satisfied",
+        container.querySelector('[data-question-id="c"]') !== null, true);
+
+      app.setAnswer("a", false);
+      assert("C card removed when chain root breaks",
+        container.querySelector('[data-question-id="c"]'), null);
+      assert("B card also removed",
+        container.querySelector('[data-question-id="b"]'), null);
+    })();
+
+    // =========================================================================
+    section("Circular reference protection");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "q1", question: "Q1", type: "text", visible_if_id: "q2", visible_if_value: "x" },
+        { id: "q2", question: "Q2", type: "text", visible_if_id: "q1", visible_if_value: "y" }
+      ]);
+      var threw = false;
+      try {
+        app.isQuestionVisible(app.getQuestion("q1"));
+      } catch (e) {
+        threw = true;
+      }
+      assert("Circular visibility does not throw", threw, false);
+    })();
+
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    var summary = document.createElement("div");
+    summary.style.marginTop = "20px";
+    summary.style.fontSize = "1.2rem";
+    summary.style.fontWeight = "bold";
+    summary.innerHTML = "Total: " + (passed + failed) +
+      " | <span class='pass'>Passed: " + passed + "</span>" +
+      " | <span class='fail'>Failed: " + failed + "</span>";
+    results.appendChild(summary);
+
+    // Machine-readable output for Playwright
+    window.__testResults = { passed: passed, failed: failed };
+  </script>
+</body>
+</html>
