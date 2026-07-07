@@ -600,6 +600,42 @@ The editor role provides a **Source code** view (formerly "Template") for editin
 
 ### Visibility
 
+Questions can be conditionally shown with `visible_if_id` and `visible_if_value`.
+
+For simple conditions, set `visible_if_id` to the controlling question id and set `visible_if_value` to the value that should make the question visible:
+
+```js
+{
+  id: "q_details",
+  question: "Please add details.",
+  type: "text",
+  visible_if_id: "q_has_details",
+  visible_if_value: "true"
+}
+```
+
+Simple `visible_if_value` supports:
+
+| Syntax | Meaning |
+| --- | --- |
+| `true` / `false` | Match boolean-like yes/no answers |
+| `other` | Match an `is_other` free-text answer |
+| `!value` | Show when the answer does not match `value` |
+| `a|b|c` | Show when the answer matches any listed token |
+
+For richer conditions, `visible_if_value` is evaluated as JavaScript when it contains at least one of `.`, `=`, or `&`. In that mode, every question id is available as a variable containing that question's current answer, and all answers are also available through `answers`.
+
+```js
+{
+  id: "q_lead_employment_details",
+  question: "Add employer or company context.",
+  type: "textarea",
+  visible_if_value: 'q_project_role=="lead" && (q_employment=="employed" || q_employment=="self_employed")'
+}
+```
+
+The rich expression can also use `value` and `refQuestion` when `visible_if_id` is set. Because this mode uses JavaScript evaluation, only use expressions from trusted questionnaire authors.
+
 | Method | Description |
 | --- | --- |
 | `isQuestionVisible(question)` | Check if a question passes its visibility condition |

@@ -350,6 +350,26 @@
     })();
 
     // =========================================================================
+    section("Rich visibility expressions");
+    // =========================================================================
+    (function () {
+      var app = makeApp([
+        { id: "question1", question: "Question 1", type: "text" },
+        { id: "question2", question: "Question 2", type: "text" },
+        { id: "question3", question: "Question 3", type: "text", visible_if_value: 'question1=="xxx" && question2=="yyy"' }
+      ]);
+
+      app.setAnswer("question1", "xxx", { silent: true });
+      app.setAnswer("question2", "nope", { silent: true });
+      assert("Rich expression hidden until all referenced answers match",
+        app.isQuestionVisible(app.getQuestion("question3")), false);
+
+      app.setAnswer("question2", "yyy", { silent: true });
+      assert("Rich expression can reference multiple question ids",
+        app.isQuestionVisible(app.getQuestion("question3")), true);
+    })();
+
+    // =========================================================================
     // Summary
     // =========================================================================
     var summary = document.createElement("div");

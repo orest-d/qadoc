@@ -203,6 +203,16 @@
             { value: "other",       label: "Other", is_other: true }
           ]
         },
+        {
+          // rich visible_if_value syntax — eval-based expression using multiple answers
+          id: "q_lead_employment_details",
+          category: "basics",
+          question: "Project leads who are employed or self-employed: add any employer or company context relevant to this project.",
+          type: "textarea",
+          rows: 2,
+          help: "This example is visible when q_project_role==\"lead\" and employment is either employed or self-employed.",
+          visible_if_value: 'q_project_role=="lead" && (q_employment=="employed" || q_employment=="self_employed")'
+        },
         // ── Governance ───────────────────────────────────────────────────────
         {
           id: "q_has_conflicts",

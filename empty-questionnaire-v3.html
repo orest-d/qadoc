@@ -501,6 +501,22 @@ textarea {
   padding: 10px 12px;
 }
 
+.q-editor-id-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.q-editor-id-change button {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  padding: 10px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .q-editor-field textarea {
   min-height: 0;
 }
@@ -2281,7 +2297,9 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     }
 
     this.configOnChange = typeof config.onChange === "function" ? config.onChange : null;
-    this.onChangeBody = typeof config.onChangeBody === "string" ? config.onChangeBody : "";
+    this.onChangeBody = typeof config.onChangeBody === "string"
+      ? config.onChangeBody
+      : (typeof this.templateOverrides.onchange === "string" ? this.templateOverrides.onchange : "");
     this.compileOnChange();
 
     this.role = ROLES.indexOf(config.role) !== -1 ? config.role : "interviewed";
@@ -2441,11 +2459,11 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     }
     if (field === "id") {
       value = String(value || "").trim();
-      if (!value || value.indexOf("-") !== -1) { return; }
+      if (!value || value.indexOf("-") !== -1) { return false; }
       var duplicate = this.questions.some(function (q) {
         return q !== question && q.id === value;
       });
-      if (duplicate) { return; }
+      if (duplicate) { return false; }
       var oldId = question.id;
       question.id = value;
       this.questions.forEach(function (q) {
@@ -2455,7 +2473,7 @@ tr.q-hidden-revealed td { opacity: 0.6; }
       this.recomputeScores();
       this.triggerChange({ type: "question", question_id: value, field: field, value: value }, options);
       if (!options || !options.deferRender) { this.render(); }
-      return;
+      return true;
     }
     if (field === "category") {
       value = sanitizeCategory(value, function (a, b) { self.warnCategoryDash(a, b); }) || "default";
@@ -2480,6 +2498,7 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     if (!options || !options.deferRender) {
       this.render();
     }
+    return true;
   };
 
   proto.addQuestion = function (question) {
@@ -3005,7 +3024,12 @@ tr.q-hidden-revealed td { opacity: 0.6; }
   // Whether a question passes its conditional visibility expression. This is
   // independent of role/view filtering so controlling values stay correct.
   proto.isExpressionVisible = function (question, stack) {
+    var visibleExpr = String(question.visible_if_value === null || typeof question.visible_if_value === "undefined"
+      ? "" : question.visible_if_value).trim();
     if (!question.visible_if_id) {
+      if (this.isRichVisibilityExpression(visibleExpr)) {
+        return this.evaluateRichVisibilityExpression(visibleExpr, undefined, null);
+      }
       return true;
     }
     stack = stack || [];
@@ -3014,11 +3038,40 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     }
     var ref = this.getQuestion(question.visible_if_id);
     if (!ref) {
+      if (this.isRichVisibilityExpression(visibleExpr)) {
+        return this.evaluateRichVisibilityExpression(visibleExpr, undefined, null);
+      }
       return true;
     }
     var refVisible = this.isExpressionVisible(ref, stack.concat(question.id));
     var value = refVisible ? this.questionValue(ref) : ref.default;
-    return this.evaluateExpression(question.visible_if_value, value, ref);
+    if (this.isRichVisibilityExpression(visibleExpr)) {
+      return this.evaluateRichVisibilityExpression(visibleExpr, value, ref);
+    }
+    return this.evaluateExpression(visibleExpr, value, ref);
+  };
+
+  proto.isRichVisibilityExpression = function (expression) {
+    return /[.=&]/.test(String(expression || ""));
+  };
+
+  proto.evaluateRichVisibilityExpression = function (expression, value, refQuestion) {
+    var scope = { value: value, refQuestion: refQuestion || null, answers: {} };
+    this.questions.forEach(function (question) {
+      scope[question.id] = this.questionValue(question);
+      scope.answers[question.id] = scope[question.id];
+    }, this);
+    try {
+      /* Rich visibility expressions are an editor-only convenience feature. */
+      return !!(new Function("scope", "value", "refQuestion",
+        "with (scope) { return !!eval(" + JSON.stringify(String(expression || "")) + "); }"
+      ))(scope, value, refQuestion || null);
+    } catch (error) {
+      if (W.console) {
+        W.console.warn("Invalid visible_if_value expression:", expression, error.message);
+      }
+      return false;
+    }
   };
 
   proto.isQuestionVisible = function (question) {
@@ -3283,6 +3336,14 @@ tr.q-hidden-revealed td { opacity: 0.6; }
         var ctx = self.questionContext(question);
         var tpl = question.type === "review" ? displayReviewerTpl : displayCardTpl;
         var rendered = W.Mustache ? W.Mustache.render(tpl, ctx) : tpl;
+        if (question.type === "html") {
+          var displayWrap = W.document.createElement("div");
+          displayWrap.innerHTML = rendered;
+          if (displayWrap.firstElementChild) {
+            self.applyHtmlQuestionContent(displayWrap.firstElementChild, question);
+            rendered = displayWrap.innerHTML;
+          }
+        }
         if (ctx._hidden_revealed) {
           html += '<div class="q-display-hidden">' + rendered + '</div>';
         } else {
@@ -3550,7 +3611,26 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     if (wouldBeHidden && this.showHidden) {
       node.classList.add("q-hidden-revealed");
     }
+    this.applyHtmlQuestionContent(node, question);
     return node.outerHTML;
+  };
+
+  proto.applyHtmlQuestionContent = function (node, question) {
+    if (!node || question.type !== "html") {
+      return;
+    }
+    var prompt = node.querySelector(".q-prompt");
+    if (prompt) {
+      prompt.innerHTML = String(question.question || "");
+    }
+    var help = node.querySelector(".q-help");
+    if (help) {
+      help.innerHTML = String(question.help || "");
+    }
+    var displayQuestion = node.querySelector(".q-display-question");
+    if (displayQuestion) {
+      displayQuestion.innerHTML = String(question.question || "");
+    }
   };
 
   proto.answerDisabled = function (question) {
@@ -4036,7 +4116,12 @@ tr.q-hidden-revealed td { opacity: 0.6; }
       return '<div class="q-editor-field is-wide"><span>' + escapeHtml(field.label || field.name) + "</span>" +
         this.renderOptionsEditor(question) + "</div>";
     }
-    if (field.ui === "checkbox") {
+    if (field.name === "id") {
+      input = '<div class="q-editor-id-change">' +
+        '<input type="text" data-editor-id-input value="' + escapeHtml(displayValue(value)) + '">' +
+        '<button type="button" data-editor-id-apply>Change ID</button>' +
+        "</div>";
+    } else if (field.ui === "checkbox") {
       input = '<input type="checkbox" data-editor-field="' + name + '"' + (value ? " checked" : "") + ">";
     } else if (field.ui === "textarea" || field.ui === "json_textarea") {
       var text = field.ui === "json_textarea" && (Array.isArray(value) || (value && typeof value === "object"))
@@ -4189,6 +4274,24 @@ tr.q-hidden-revealed td { opacity: 0.6; }
         if (field === "id") { ref.id = value; }
       });
     });
+    var idInput = panel.querySelector("[data-editor-id-input]");
+    var idApply = panel.querySelector("[data-editor-id-apply]");
+    if (idInput && idApply) {
+      idApply.addEventListener("click", function () {
+        var oldId = ref.id;
+        if (self.updateQuestionField(ref.id, "id", idInput.value)) {
+          ref.id = idInput.value;
+        } else {
+          idInput.value = oldId;
+        }
+      });
+      idInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          idApply.click();
+        }
+      });
+    }
     this.bindOptionsEditor(panel, ref.id);
   };
 
@@ -4305,6 +4408,9 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     }
     if (!editable) {
       return '<span class="q-tabular-readonly">' + escapeHtml(displayValue(value)) + "</span>";
+    }
+    if (column === "id") {
+      return '<span class="q-tabular-readonly" title="Use Edit → Change ID">' + escapeHtml(displayValue(value)) + "</span>";
     }
     if (column === "type") {
       return '<select data-tabular-field="type" data-tabular-id="' + id + '">' + QUESTION_TYPES.map(function (type) {
@@ -4461,11 +4567,11 @@ tr.q-hidden-revealed td { opacity: 0.6; }
   // Resolution chain: templateOverrides → _initialTemplates → FALLBACK_TEMPLATES.
   // Computed templates (css, data, script, onchange) are handled separately.
   proto.getTemplateBody = function (templateId) {
-    if (Object.prototype.hasOwnProperty.call(this.templateOverrides, templateId)) {
-      return this.templateOverrides[templateId];
-    }
     if (templateId === "onchange") {
       return this.onChangeBody || "";
+    }
+    if (Object.prototype.hasOwnProperty.call(this.templateOverrides, templateId)) {
+      return this.templateOverrides[templateId];
     }
     if (templateId === "css") {
       return this._collectInlineCss();
@@ -4520,6 +4626,7 @@ tr.q-hidden-revealed td { opacity: 0.6; }
     }
     if (templateId === "onchange") {
       this.onChangeBody = body;
+      this.templateOverrides[templateId] = body;
       this.compileOnChange();
     } else {
       this.templateOverrides[templateId] = body;

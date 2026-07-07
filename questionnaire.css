@@ -494,6 +494,22 @@ textarea {
   padding: 10px 12px;
 }
 
+.q-editor-id-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.q-editor-id-change button {
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--q-ink);
+  padding: 10px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .q-editor-field textarea {
   min-height: 0;
 }
