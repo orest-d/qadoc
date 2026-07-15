@@ -162,6 +162,7 @@
       '    <button type="button" class="q-menu-trigger">File</button>\n' +
       '    <div class="q-menu-dropdown">\n' +
       '      <label class="q-menu-item q-load-button">📂 Load CSV<input type="file" id="load-csv" accept=".csv,text/csv"></label>\n' +
+      '      <label class="q-menu-item q-load-button" data-roles="reviewer editor">📂 Load JSON<input type="file" id="load-json" accept="application/json,.json"></label>\n' +
       '      <button type="button" class="q-menu-item" id="save-csv">💾 Save CSV</button>\n' +
       '      <button type="button" class="q-menu-item" id="save-json" data-roles="reviewer editor">💾 Save JSON</button>\n' +
       '      <button type="button" class="q-menu-item" id="save-html">💾 Save HTML</button>\n' +
@@ -1827,6 +1828,15 @@
         file.text().then(function (text) { self.loadCsv(text); });
       });
     }
+    var loadJson = container.querySelector("#load-json") || (doc && doc.getElementById("load-json"));
+    if (loadJson && !loadJson._qBound) {
+      loadJson._qBound = true;
+      loadJson.addEventListener("change", function () {
+        var file = loadJson.files && loadJson.files[0];
+        if (!file) { return; }
+        file.text().then(function (text) { self.loadJson(text); });
+      });
+    }
     // Save shortcut
     var saveShortcut = container.querySelector("#save-html-shortcut");
     if (saveShortcut && !saveShortcut._qBound) {
@@ -2199,7 +2209,6 @@
 
   proto.bindQuestionControls = function (container) {
     var self = this;
-    var textRenderDebounce = null;
     container.querySelectorAll("[data-answer]").forEach(function (element) {
       var id = element.getAttribute("data-answer");
       var isText = element.tagName === "TEXTAREA" || element.type === "text";
@@ -2214,11 +2223,10 @@
           value = parseScalar(element.value);
         }
         self.setAnswer(id, value, { deferRender: isText });
-        if (isText) {
-          if (textRenderDebounce) { W.clearTimeout(textRenderDebounce); }
-          textRenderDebounce = W.setTimeout(function () { self.render(); }, 300);
-        }
       });
+      if (isText) {
+        element.addEventListener("change", function () { self.render(); });
+      }
     });
 
     container.querySelectorAll("[data-yesno]").forEach(function (element) {
